@@ -113,7 +113,6 @@ func (f *Flit) Issue(id string) *dgrl.Branch {
 
 func (f *Flit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
-
 	for _, node := range f.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
 			if IssueContains(issue, key, val) {
@@ -122,17 +121,6 @@ func (f *Flit) Match(key, val string, doesMatch bool) []string {
 		}
 	}
 	return matches
-}
-
-func IssueContains(issue *dgrl.Branch, key, val string) bool {
-	for _, kid := range issue.Kids() {
-		if leaf, ok := kid.(*dgrl.Leaf); ok {
-			if strings.Contains(leaf.Key(), key) && strings.Contains(leaf.Value(), val) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func Get(issue *dgrl.Branch, key string) (string, bool) {
@@ -144,6 +132,15 @@ func Get(issue *dgrl.Branch, key string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func IssueContains(issue *dgrl.Branch, key, val string) bool {
+	if issueVal, ok := Get(issue, key); ok {
+		if strings.Contains(issueVal, val) {
+			return true
+		}
+	}
+	return false
 }
 
 func Set(issue *dgrl.Branch, key, val string) bool {
