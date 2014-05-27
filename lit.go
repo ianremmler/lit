@@ -105,7 +105,7 @@ func (l *Lit) NewIssue() (string, error) {
 
 func (l *Lit) Issue(id string) *dgrl.Branch {
 	for _, node := range l.issues.Kids() {
-		if node.Type() == dgrl.BranchType && node.Key() == id {
+		if node.Type() == dgrl.BranchType && strings.HasPrefix(node.Key(), id) {
 			return node.(*dgrl.Branch)
 		}
 	}

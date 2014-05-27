@@ -25,12 +25,16 @@ lit id <spec>                 List ids in spec
 lit show <spec>               Show issues in spec
 lit set <field> <val> <spec>  Set issue field
 lit edit <spec>               Edit issues in spec
-lit close <spec>              Close issue in spec
+lit close <spec>              Close issues in spec
 lit reopen <spec>             Reopen closed issues in spec`
 
+// id, stat, priority, assigned, tags, summary
+const listFmt = "%-8.8s %-5.5s %-3.3s %-6.6s %-13.13s %s"
+
 var (
-	args = os.Args[1:]
-	it   = lit.New()
+	args    = os.Args[1:]
+	it      = lit.New()
+	listHdr = fmt.Sprintf(listFmt, "id", "stat", "pri", "assign", "tags", "summary")
 )
 
 func main() {
@@ -39,7 +43,7 @@ func main() {
 
 	cmd := ""
 	if len(args) > 0 {
-		cmd = strings.ToLower(args[0])
+		cmd = args[0]
 		args = args[1:]
 	}
 	switch cmd {
@@ -86,8 +90,7 @@ func newCmd() {
 
 func listCmd() {
 	loadIssues("list")
-	fmt.Printf("%-36.36s %-8.8s %-8.8s %-8.8s %-8.8s %s\n",
-		"id", "status", "tags", "priority", "assigned", "summary")
+	fmt.Println(listHdr)
 	for _, id := range specIds(args) {
 		issue := it.Issue(id)
 		if issue != nil {
@@ -147,13 +150,14 @@ func editCmd() {
 		log.Fatalln("edit: You must specify a spec to edit")
 	}
 
+	loadIssues("edit")
+
 	// create temp file
-	issueFile, err := ioutil.TempFile("", "lit-")
+	tempFile, err := ioutil.TempFile("", "lit-")
 	checkErr("edit", err)
-	filename := issueFile.Name()
+	filename := tempFile.Name()
 
 	// load issue content into temp file
-	loadIssues("edit")
 	ids := specIds(args)
 	for _, id := range ids {
 		issue := it.Issue(id)
@@ -165,9 +169,9 @@ func editCmd() {
 			log.Printf("edit: Error setting update time for %s\n")
 			continue
 		}
-		fmt.Fprintln(issueFile, issue)
+		fmt.Fprintln(tempFile, issue)
 	}
-	issueFile.Close()
+	tempFile.Close()
 
 	// get original file state
 	origStat, err := os.Stat(filename)
@@ -187,10 +191,10 @@ func editCmd() {
 	}
 
 	// parse issue from temp file
-	issueFile, err = os.Open(filename)
+	tempFile, err = os.Open(filename)
 	checkErr("edit", err)
-	defer issueFile.Close()
-	edited := dgrl.NewParser().Parse(issueFile)
+	edited := dgrl.NewParser().Parse(tempFile)
+	tempFile.Close()
 	if edited == nil {
 		log.Fatalln("edit: Error parsing file")
 	}
@@ -204,7 +208,7 @@ func editCmd() {
 			continue
 		}
 		for _, node := range edited.Kids() {
-			if node.Type() == dgrl.BranchType && node.Key() == id {
+			if node.Type() == dgrl.BranchType && strings.HasPrefix(node.Key(), id) {
 				if editedIssue, ok := node.(*dgrl.Branch); ok {
 					*issue = *editedIssue
 					didUpdate = true
@@ -251,12 +255,14 @@ func closeCmd(cmd string) {
 
 func listInfo(id string, issue *dgrl.Branch) string {
 	status, _ := lit.Get(issue, "status")
-	typ, _ := lit.Get(issue, "type")
+	tags, _ := lit.Get(issue, "tags")
+	if len(tags) > 13 {
+		tags = tags[:10] + "..."
+	}
 	priority, _ := lit.Get(issue, "priority")
 	assigned, _ := lit.Get(issue, "assigned")
 	summary, _ := lit.Get(issue, "summary")
-	return fmt.Sprintf("%s %-7.7s %-7.7s %-7.7s %-7.7s %s",
-		id, status, typ, priority, assigned, summary)
+	return fmt.Sprintf(listFmt, id, status, priority, assigned, tags, summary)
 }
 
 func matchIds(kv []string, doesMatch bool) []string {
