@@ -88,8 +88,8 @@ func (f *Flit) NewIssue() (string, error) {
 	}
 	id := uuid.New()
 	issue := dgrl.NewBranch(id)
-	issue.Append(dgrl.NewLeaf("created", stamp()))
-	issue.Append(dgrl.NewLeaf("updated", stamp()))
+	issue.Append(dgrl.NewLeaf("created", Stamp()))
+	issue.Append(dgrl.NewLeaf("updated", Stamp()))
 	issue.Append(dgrl.NewLeaf("closed", ""))
 	issue.Append(dgrl.NewLeaf("summary", ""))
 	issue.Append(dgrl.NewLeaf("tags", ""))
@@ -135,18 +135,27 @@ func IssueContains(issue *dgrl.Branch, key, val string) bool {
 	return false
 }
 
-func Set(issue *dgrl.Branch, key, val string) {
+func Get(issue *dgrl.Branch, key string) (string, bool) {
 	for _, kid := range issue.Kids() {
 		if leaf, ok := kid.(*dgrl.Leaf); ok {
-			if leaf.Key() == key {
-				leaf.SetValue(val)
-				return
+			if strings.Contains(leaf.Key(), key) {
+				return leaf.Value(), true
 			}
 		}
 	}
-	// didn't find leaf, so create one
-	issue.Append(dgrl.NewLeaf(key, val))
-	return
+	return "", false
+}
+
+func Set(issue *dgrl.Branch, key, val string) bool {
+	for _, kid := range issue.Kids() {
+		if leaf, ok := kid.(*dgrl.Leaf); ok {
+			if strings.Contains(leaf.Key(), key) {
+				leaf.SetValue(val)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func curTime() string {
@@ -161,7 +170,7 @@ func curUser() (string, error) {
 	return user.Username, nil
 }
 
-func stamp() string {
+func Stamp() string {
 	user, err := curUser()
 	if err != nil {
 		user = "?"

@@ -13,16 +13,18 @@ import (
 
 const usage = `usage:
 
-spec: . | all | <id(s)> | (with|without) <key> [<val>]
+spec: . | all | <id(s)> | (with|without) <field> [<val>]
 	'.' indicates the currently open issue
 
-flit [help | usage]    Show usage
-flit state [<spec>]    Show issue state
-flit init              Initialize new issue tracker
-flit new               Create new issue
-flit id [<spec>]       List ids, optionally filtering by key/value
-flit show [<spec>]     Show issue (default: current)
-flit edit <id>         Edit issue`
+flit [help | usage]          Show usage
+flit state <spec>            Show state of issues matching spec
+flit init                    Initialize new issue tracker
+flit new                     Create new issue
+flit id <spec>               List ids matching spec
+flit show <spec>             Show issues matching spec
+flit set <id> <field> <val>  Set issue field
+flit edit <id>               Edit issue
+flit close <id>              Close issue`
 
 var (
 	args = os.Args[1:]
@@ -55,6 +57,8 @@ func main() {
 		setCmd()
 	case "edit":
 		editCmd()
+	case "close":
+		closeCmd()
 	default:
 		log.Fatalln(cmd + " is not a valid command\n\n" + usage)
 	}
@@ -79,10 +83,13 @@ func newCmd() {
 }
 
 func stateCmd() {
-	// verifyRepo()
-	// for _, id := range specIds(args) {
-	// fmt.Println(stateSummary(id))
-	// }
+	loadIssues("state")
+	for _, id := range specIds(args) {
+		issue := it.Issue(id)
+		if issue != nil {
+			fmt.Println(stateSummary(id, issue))
+		}
+	}
 }
 
 func idCmd() {
@@ -102,16 +109,20 @@ func showCmd() {
 }
 
 func setCmd() {
-	loadIssues("set")
 	if len(args) < 3 {
-		log.Fatalln("set: You must specify a valid issue id, key, and value")
+		log.Fatalln("set: You must specify a valid issue id, field, and value")
 	}
 	id, key, val := args[0], args[1], args[2]
+	loadIssues("set")
 	issue := it.Issue(id)
 	if issue == nil {
 		log.Fatalln("set: Error finding issue")
 	}
-	flit.Set(issue, key, val)
+	ok := flit.Set(issue, key, val)
+	ok = ok && flit.Set(issue, "updated", flit.Stamp())
+	if !ok {
+		log.Fatalln("set: Error updating issue fields")
+	}
 	storeIssues("set")
 }
 
@@ -128,9 +139,12 @@ func editCmd() {
 	}
 
 	// get the issue
-	loadIssues("edit")
 	id := args[0]
+	loadIssues("edit")
 	issue := it.Issue(id)
+	if !flit.Set(issue, "updated", flit.Stamp()) {
+		log.Fatalln("edit: Error setting update time")
+	}
 	if issue == nil {
 		log.Fatalln("edit: Error finding issue")
 	}
@@ -186,17 +200,35 @@ func editCmd() {
 	storeIssues("edit")
 }
 
-// func stateSummary(id string) string {
-// verifyIssue(id)
-// status, _ := it.Value(id, "status")
-// typ, _ := it.Value(id, "type")
-// priority, _ := it.Value(id, "priority")
-// assigned, _ := it.Value(id, "assigned")
-// summary, _ := it.Value(id, "summary")
-// numAtt := len(it.Attachments(id))
-// return fmt.Sprintf("%s %-7.7s %-7.7s %-7.7s %-7.7s %-2d %s",
-// id, status, typ, priority, assigned, numAtt, summary)
-// }
+func closeCmd() {
+	if len(args) < 1 {
+		log.Fatalln("close: You must specify an issue to close")
+	}
+	id := args[0]
+	loadIssues("close")
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalln("close: Error finding issue")
+	}
+	stamp := flit.Stamp()
+	ok := flit.Set(issue, "status", "closed")
+	ok = ok && flit.Set(issue, "closed", stamp)
+	ok = ok && flit.Set(issue, "updated", stamp)
+	if !ok {
+		log.Fatalln("close: Error updating issue fields")
+	}
+	storeIssues("close")
+}
+
+func stateSummary(id string, issue *dgrl.Branch) string {
+	status, _ := flit.Get(issue, "status")
+	typ, _ := flit.Get(issue, "type")
+	priority, _ := flit.Get(issue, "priority")
+	assigned, _ := flit.Get(issue, "assigned")
+	summary, _ := flit.Get(issue, "summary")
+	return fmt.Sprintf("%s %-7.7s %-7.7s %-7.7s %-7.7s %s",
+		id, status, typ, priority, assigned, summary)
+}
 
 func matchIds(kv []string, doesMatch bool) []string {
 	key, val := "", ""
