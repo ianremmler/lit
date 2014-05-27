@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -17,15 +18,15 @@ spec: . | all | <id(s)> | (with|without) <field> [<val>]
 	'.' indicates the currently open issue
 
 lit [help | usage]            Show usage
-lit list <spec>               Show list of issues matching spec
+lit list <spec>               Show list of issues in spec
 lit init                      Initialize new issue tracker
 lit new                       Create new issue
-lit id <spec>                 List ids matching spec
-lit show <spec>               Show issues matching spec
+lit id <spec>                 List ids in spec
+lit show <spec>               Show issues in spec
 lit set <field> <val> <spec>  Set issue field
-lit edit <id>                 Edit issue
-lit close <spec>              Close issue matching spec
-lit reopen <spec>             Reopen closed issues matching spec`
+lit edit <spec>               Edit issues in spec
+lit close <spec>              Close issue in spec
+lit reopen <spec>             Reopen closed issues in spec`
 
 var (
 	args = os.Args[1:]
@@ -58,10 +59,8 @@ func main() {
 		setCmd()
 	case "edit":
 		editCmd()
-	case "close":
-		closeCmd()
-	case "reopen":
-		reopenCmd()
+	case "close", "reopen":
+		closeCmd(cmd)
 	default:
 		log.Fatalln(cmd + " is not a valid command\n\n" + usage)
 	}
@@ -123,12 +122,14 @@ func setCmd() {
 	for _, id := range specIds(spec) {
 		issue := it.Issue(id)
 		if issue == nil {
-			log.Fatalln("set: Error finding issue")
+			log.Printf("set: Error finding issue %s\n", id)
+			continue
 		}
 		ok := lit.Set(issue, key, val)
 		ok = ok && lit.Set(issue, "updated", stamp)
 		if !ok {
-			log.Fatalln("set: Error updating issue fields")
+			log.Printf("set: Error updating fields in %s\n", id)
+			continue
 		}
 	}
 	storeIssues("set")
@@ -143,25 +144,29 @@ func editCmd() {
 		log.Fatalln("VISUAL or EDITOR environment variable must be set")
 	}
 	if len(args) < 1 {
-		log.Fatalln("edit: You must specify a valid issue id")
+		log.Fatalln("edit: You must specify a spec to edit")
 	}
 
-	// get the issue
-	id := args[0]
-	loadIssues("edit")
-	issue := it.Issue(id)
-	if !lit.Set(issue, "updated", lit.Stamp()) {
-		log.Fatalln("edit: Error setting update time")
-	}
-	if issue == nil {
-		log.Fatalln("edit: Error finding issue")
-	}
-
-	// write the issue to a temp file
-	filename := os.TempDir() + "/issue-" + id
-	issueFile, err := os.Create(filename)
+	// create temp file
+	issueFile, err := ioutil.TempFile("", "lit-")
 	checkErr("edit", err)
-	fmt.Fprintln(issueFile, issue)
+	filename := issueFile.Name()
+
+	// load issue content into temp file
+	loadIssues("edit")
+	ids := specIds(args)
+	for _, id := range ids {
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Printf("edit: Error finding issue %s\n")
+			continue
+		}
+		if !lit.Set(issue, "updated", lit.Stamp()) {
+			log.Printf("edit: Error setting update time for %s\n")
+			continue
+		}
+		fmt.Fprintln(issueFile, issue)
+	}
 	issueFile.Close()
 
 	// get original file state
@@ -178,7 +183,7 @@ func editCmd() {
 	newStat, err := os.Stat(filename)
 	checkErr("edit", err)
 	if newStat.ModTime() == origStat.ModTime() {
-		log.Fatalln("edit: Issue unchanged")
+		log.Fatalln("edit: File unchanged")
 	}
 
 	// parse issue from temp file
@@ -187,67 +192,61 @@ func editCmd() {
 	defer issueFile.Close()
 	edited := dgrl.NewParser().Parse(issueFile)
 	if edited == nil {
-		log.Fatalln("edit: Error parsing issue")
+		log.Fatalln("edit: Error parsing file")
 	}
 
-	// update issue if we find a match
+	// update issues if we find a match
 	didUpdate := false
-	for _, node := range edited.Kids() {
-		if node.Type() == dgrl.BranchType && node.Key() == id {
-			if editedIssue, ok := node.(*dgrl.Branch); ok {
-				*issue = *editedIssue
-				didUpdate = true
-				break
+	for _, id := range ids {
+		issue := it.Issue(id)
+		if issue == nil {
+			// already printed error, so don't repeat here
+			continue
+		}
+		for _, node := range edited.Kids() {
+			if node.Type() == dgrl.BranchType && node.Key() == id {
+				if editedIssue, ok := node.(*dgrl.Branch); ok {
+					*issue = *editedIssue
+					didUpdate = true
+					break
+				}
 			}
 		}
 	}
 	if !didUpdate {
-		log.Fatalln("edit: Error updating issue")
+		log.Fatalln("edit: Did not update anything")
 	}
 
 	storeIssues("edit")
 }
 
-func closeCmd() {
+func closeCmd(cmd string) {
 	if len(args) < 1 {
-		log.Fatalln("close: You must specify a spec to close")
+		log.Fatalf("%s: You must specify a spec\n", cmd)
 	}
-	stamp := lit.Stamp()
-	for _, id := range specIds(args) {
-		loadIssues("close")
-		issue := it.Issue(id)
-		if issue == nil {
-			log.Fatalln("close: Error finding issue")
-		}
-		ok := lit.Set(issue, "status", "closed")
-		ok = ok && lit.Set(issue, "closed", stamp)
-		ok = ok && lit.Set(issue, "updated", stamp)
-		if !ok {
-			log.Fatalln("close: Error updating issue fields")
-		}
-	}
-	storeIssues("close")
-}
-
-func reopenCmd() {
-	if len(args) < 1 {
-		log.Fatalln("reopen: You must specify an issue to reopen")
-	}
-	loadIssues("reopen")
+	loadIssues(cmd)
 	stamp := lit.Stamp()
 	for _, id := range specIds(args) {
 		issue := it.Issue(id)
 		if issue == nil {
-			log.Fatalln("reopen: Error finding issue")
+			log.Printf("%s: Error finding issue %s\n", cmd, id)
+			continue
 		}
-		ok := lit.Set(issue, "status", "open")
-		ok = ok && lit.Set(issue, "closed", "")
+		status := "closed"
+		closedStamp := stamp
+		if cmd == "reopen" {
+			status = "open"
+			closedStamp = ""
+		}
+		ok := lit.Set(issue, "status", status)
+		ok = ok && lit.Set(issue, "closed", closedStamp)
 		ok = ok && lit.Set(issue, "updated", stamp)
 		if !ok {
-			log.Fatalln("reopen: Error updating issue fields")
+			log.Printf("%s: Error updating fields for %s\n", cmd, id)
+			continue
 		}
 	}
-	storeIssues("reopen")
+	storeIssues(cmd)
 }
 
 func listInfo(id string, issue *dgrl.Branch) string {
