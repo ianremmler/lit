@@ -17,14 +17,15 @@ spec: . | all | <id(s)> | (with|without) <field> [<val>]
 	'.' indicates the currently open issue
 
 flit [help | usage]          Show usage
-flit state <spec>            Show state of issues matching spec
+flit list <spec>             Show list of issues matching spec
 flit init                    Initialize new issue tracker
 flit new                     Create new issue
 flit id <spec>               List ids matching spec
 flit show <spec>             Show issues matching spec
 flit set <id> <field> <val>  Set issue field
 flit edit <id>               Edit issue
-flit close <id>              Close issue`
+flit close <id>              Close issue
+flit reopen <id>             Reopen closed issue`
 
 var (
 	args = os.Args[1:]
@@ -43,8 +44,8 @@ func main() {
 	switch cmd {
 	case "", "-h", "-help", "--help", "help", "-u", "-usage", "--usage", "usage":
 		usageCmd()
-	case "state":
-		stateCmd()
+	case "list":
+		listCmd()
 	case "init":
 		initCmd()
 	case "new":
@@ -59,6 +60,8 @@ func main() {
 		editCmd()
 	case "close":
 		closeCmd()
+	case "reopen":
+		reopenCmd()
 	default:
 		log.Fatalln(cmd + " is not a valid command\n\n" + usage)
 	}
@@ -82,12 +85,14 @@ func newCmd() {
 	fmt.Println(id)
 }
 
-func stateCmd() {
-	loadIssues("state")
+func listCmd() {
+	loadIssues("list")
+	fmt.Printf("%-36.36s %-8.8s %-8.8s %-8.8s %-8.8s %s\n",
+		"id", "status", "tags", "priority", "assigned", "summary")
 	for _, id := range specIds(args) {
 		issue := it.Issue(id)
 		if issue != nil {
-			fmt.Println(stateSummary(id, issue))
+			fmt.Println(listInfo(id, issue))
 		}
 	}
 }
@@ -220,7 +225,26 @@ func closeCmd() {
 	storeIssues("close")
 }
 
-func stateSummary(id string, issue *dgrl.Branch) string {
+func reopenCmd() {
+	if len(args) < 1 {
+		log.Fatalln("reopen: You must specify an issue to reopen")
+	}
+	id := args[0]
+	loadIssues("reopen")
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalln("reopen: Error finding issue")
+	}
+	ok := flit.Set(issue, "status", "open")
+	ok = ok && flit.Set(issue, "closed", "")
+	ok = ok && flit.Set(issue, "updated", flit.Stamp())
+	if !ok {
+		log.Fatalln("reopen: Error updating issue fields")
+	}
+	storeIssues("reopen")
+}
+
+func listInfo(id string, issue *dgrl.Branch) string {
 	status, _ := flit.Get(issue, "status")
 	typ, _ := flit.Get(issue, "type")
 	priority, _ := flit.Get(issue, "priority")
