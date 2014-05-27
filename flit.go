@@ -115,7 +115,7 @@ func (f *Flit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
 	for _, node := range f.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
-			if IssueContains(issue, key, val) {
+			if IssueContains(issue, key, val) == doesMatch {
 				matches = append(matches, issue.Key())
 			}
 		}
