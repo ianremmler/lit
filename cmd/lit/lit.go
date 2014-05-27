@@ -16,16 +16,16 @@ const usage = `usage:
 spec: . | all | <id(s)> | (with|without) <field> [<val>]
 	'.' indicates the currently open issue
 
-lit [help | usage]          Show usage
-lit list <spec>             Show list of issues matching spec
-lit init                    Initialize new issue tracker
-lit new                     Create new issue
-lit id <spec>               List ids matching spec
-lit show <spec>             Show issues matching spec
-lit set <id> <field> <val>  Set issue field
-lit edit <id>               Edit issue
-lit close <id>              Close issue
-lit reopen <id>             Reopen closed issue`
+lit [help | usage]            Show usage
+lit list <spec>               Show list of issues matching spec
+lit init                      Initialize new issue tracker
+lit new                       Create new issue
+lit id <spec>                 List ids matching spec
+lit show <spec>               Show issues matching spec
+lit set <field> <val> <spec>  Set issue field
+lit edit <id>                 Edit issue
+lit close <spec>              Close issue matching spec
+lit reopen <spec>             Reopen closed issues matching spec`
 
 var (
 	args = os.Args[1:]
@@ -115,18 +115,21 @@ func showCmd() {
 
 func setCmd() {
 	if len(args) < 3 {
-		log.Fatalln("set: You must specify a valid issue id, field, and value")
+		log.Fatalln("set: You must specify a field, and value, and spec")
 	}
-	id, key, val := args[0], args[1], args[2]
+	key, val, spec := args[0], args[1], args[2:]
 	loadIssues("set")
-	issue := it.Issue(id)
-	if issue == nil {
-		log.Fatalln("set: Error finding issue")
-	}
-	ok := lit.Set(issue, key, val)
-	ok = ok && lit.Set(issue, "updated", lit.Stamp())
-	if !ok {
-		log.Fatalln("set: Error updating issue fields")
+	stamp := lit.Stamp()
+	for _, id := range specIds(spec) {
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Fatalln("set: Error finding issue")
+		}
+		ok := lit.Set(issue, key, val)
+		ok = ok && lit.Set(issue, "updated", stamp)
+		if !ok {
+			log.Fatalln("set: Error updating issue fields")
+		}
 	}
 	storeIssues("set")
 }
@@ -207,20 +210,21 @@ func editCmd() {
 
 func closeCmd() {
 	if len(args) < 1 {
-		log.Fatalln("close: You must specify an issue to close")
-	}
-	id := args[0]
-	loadIssues("close")
-	issue := it.Issue(id)
-	if issue == nil {
-		log.Fatalln("close: Error finding issue")
+		log.Fatalln("close: You must specify a spec to close")
 	}
 	stamp := lit.Stamp()
-	ok := lit.Set(issue, "status", "closed")
-	ok = ok && lit.Set(issue, "closed", stamp)
-	ok = ok && lit.Set(issue, "updated", stamp)
-	if !ok {
-		log.Fatalln("close: Error updating issue fields")
+	for _, id := range specIds(args) {
+		loadIssues("close")
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Fatalln("close: Error finding issue")
+		}
+		ok := lit.Set(issue, "status", "closed")
+		ok = ok && lit.Set(issue, "closed", stamp)
+		ok = ok && lit.Set(issue, "updated", stamp)
+		if !ok {
+			log.Fatalln("close: Error updating issue fields")
+		}
 	}
 	storeIssues("close")
 }
@@ -229,17 +233,19 @@ func reopenCmd() {
 	if len(args) < 1 {
 		log.Fatalln("reopen: You must specify an issue to reopen")
 	}
-	id := args[0]
 	loadIssues("reopen")
-	issue := it.Issue(id)
-	if issue == nil {
-		log.Fatalln("reopen: Error finding issue")
-	}
-	ok := lit.Set(issue, "status", "open")
-	ok = ok && lit.Set(issue, "closed", "")
-	ok = ok && lit.Set(issue, "updated", lit.Stamp())
-	if !ok {
-		log.Fatalln("reopen: Error updating issue fields")
+	stamp := lit.Stamp()
+	for _, id := range specIds(args) {
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Fatalln("reopen: Error finding issue")
+		}
+		ok := lit.Set(issue, "status", "open")
+		ok = ok && lit.Set(issue, "closed", "")
+		ok = ok && lit.Set(issue, "updated", stamp)
+		if !ok {
+			log.Fatalln("reopen: Error updating issue fields")
+		}
 	}
 	storeIssues("reopen")
 }

@@ -88,13 +88,14 @@ func (l *Lit) NewIssue() (string, error) {
 	}
 	id := uuid.New()
 	issue := dgrl.NewBranch(id)
-	issue.Append(dgrl.NewLeaf("created", Stamp()))
-	issue.Append(dgrl.NewLeaf("updated", Stamp()))
+	stamp := Stamp()
+	issue.Append(dgrl.NewLeaf("created", stamp))
+	issue.Append(dgrl.NewLeaf("updated", stamp))
 	issue.Append(dgrl.NewLeaf("closed", ""))
 	issue.Append(dgrl.NewLeaf("summary", ""))
 	issue.Append(dgrl.NewLeaf("tags", ""))
-	issue.Append(dgrl.NewLeaf("status", ""))
-	issue.Append(dgrl.NewLeaf("priority", ""))
+	issue.Append(dgrl.NewLeaf("status", "open"))
+	issue.Append(dgrl.NewLeaf("priority", "low"))
 	issue.Append(dgrl.NewLeaf("assigned", ""))
 	issue.Append(dgrl.NewLongLeaf("description", "\n"))
 	l.issues.Append(issue)
@@ -115,7 +116,7 @@ func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
 	for _, node := range l.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
-			if IssueContains(issue, key, val) == doesMatch {
+			if Contains(issue, key, val) == doesMatch {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -134,7 +135,7 @@ func Get(issue *dgrl.Branch, key string) (string, bool) {
 	return "", false
 }
 
-func IssueContains(issue *dgrl.Branch, key, val string) bool {
+func Contains(issue *dgrl.Branch, key, val string) bool {
 	if issueVal, ok := Get(issue, key); ok {
 		if strings.Contains(issueVal, val) {
 			return true
