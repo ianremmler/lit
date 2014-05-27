@@ -94,8 +94,7 @@ func (l *Lit) NewIssue() (string, error) {
 	issue.Append(dgrl.NewLeaf("closed", ""))
 	issue.Append(dgrl.NewLeaf("summary", ""))
 	issue.Append(dgrl.NewLeaf("tags", ""))
-	issue.Append(dgrl.NewLeaf("status", "open"))
-	issue.Append(dgrl.NewLeaf("priority", "low"))
+	issue.Append(dgrl.NewLeaf("priority", "1"))
 	issue.Append(dgrl.NewLeaf("assigned", ""))
 	issue.Append(dgrl.NewLongLeaf("description", "\n"))
 	l.issues.Append(issue)
@@ -117,6 +116,21 @@ func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	for _, node := range l.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
 			if Contains(issue, key, val) == doesMatch {
+				matches = append(matches, issue.Key())
+			}
+		}
+	}
+	return matches
+}
+
+func (l *Lit) Compare(key, val string, isLess bool) []string {
+	matches := []string{}
+	if val == "" {
+		return matches
+	}
+	for _, node := range l.issues.Kids() {
+		if issue, ok := node.(*dgrl.Branch); ok {
+			if Less(issue, key, val, !isLess) == isLess {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -147,6 +161,20 @@ func Contains(issue *dgrl.Branch, key, val string) bool {
 	return false
 }
 
+func Less(issue *dgrl.Branch, key, val string, incl bool) bool {
+	if issueVal, ok := Get(issue, key); ok {
+		if issueVal == "" {
+			return false
+		}
+		if incl {
+			return issueVal <= val
+		} else {
+			return issueVal < val
+		}
+	}
+	return false
+}
+
 func Set(issue *dgrl.Branch, key, val string) bool {
 	for _, kid := range issue.Kids() {
 		if leaf, ok := kid.(*dgrl.Leaf); ok {
@@ -160,7 +188,7 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 }
 
 func curTime() string {
-	return time.Now().Format(time.RFC3339)
+	return time.Now().UTC().Format(time.RFC3339)
 }
 
 func curUser() (string, error) {
@@ -176,5 +204,5 @@ func Stamp() string {
 	if err != nil {
 		user = "?"
 	}
-	return user + " " + curTime()
+	return curTime() + " " + user
 }

@@ -28,13 +28,15 @@ lit edit <spec>               Edit issues in spec
 lit close <spec>              Close issues in spec
 lit reopen <spec>             Reopen closed issues in spec`
 
-// id, stat, priority, assigned, tags, summary
-const listFmt = "%-8.8s %-5.5s %-3.3s %-6.6s %-13.13s %s"
+const (
+	// id, stat, priority, assigned, tags, summary
+	listFmt = "%-8.8s %-1.1s %-1.1s %-6.6s %-16.16s %s"
+)
 
 var (
 	args    = os.Args[1:]
 	it      = lit.New()
-	listHdr = fmt.Sprintf(listFmt, "id", "stat", "pri", "assign", "tags", "summary")
+	listHdr = fmt.Sprintf(listFmt, "id", "c", "p", "assign", "tags", "summary")
 )
 
 func main() {
@@ -236,14 +238,11 @@ func closeCmd(cmd string) {
 			log.Printf("%s: Error finding issue %s\n", cmd, id)
 			continue
 		}
-		status := "closed"
-		closedStamp := stamp
-		if cmd == "reopen" {
-			status = "open"
-			closedStamp = ""
+		closedStamp := ""
+		if cmd == "close" {
+			closedStamp = stamp
 		}
-		ok := lit.Set(issue, "status", status)
-		ok = ok && lit.Set(issue, "closed", closedStamp)
+		ok := lit.Set(issue, "closed", closedStamp)
 		ok = ok && lit.Set(issue, "updated", stamp)
 		if !ok {
 			log.Printf("%s: Error updating fields for %s\n", cmd, id)
@@ -254,7 +253,11 @@ func closeCmd(cmd string) {
 }
 
 func listInfo(id string, issue *dgrl.Branch) string {
-	status, _ := lit.Get(issue, "status")
+	status := " "
+	closed, _ := lit.Get(issue, "closed")
+	if len(closed) > 0 {
+		status = "*"
+	}
 	tags, _ := lit.Get(issue, "tags")
 	if len(tags) > 13 {
 		tags = tags[:10] + "..."
@@ -276,6 +279,17 @@ func matchIds(kv []string, doesMatch bool) []string {
 	return it.Match(key, val, doesMatch)
 }
 
+func compareIds(kv []string, isLess bool) []string {
+	key, val := "", ""
+	if len(kv) > 0 {
+		key = kv[0]
+	}
+	if len(kv) > 1 {
+		val = kv[1]
+	}
+	return it.Compare(key, val, isLess)
+}
+
 func specIds(args []string) []string {
 	ids := []string{}
 	switch {
@@ -285,6 +299,10 @@ func specIds(args []string) []string {
 		ids = matchIds(args[1:], true)
 	case args[0] == "without":
 		ids = matchIds(args[1:], false)
+	case args[0] == "less":
+		ids = compareIds(args[1:], true)
+	case args[0] == "greater":
+		ids = compareIds(args[1:], false)
 	case args[0] == "all":
 		ids = it.IssueIds()
 	default:
