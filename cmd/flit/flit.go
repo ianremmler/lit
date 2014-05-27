@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 
+	"github.com/ianremmler/dgrl"
 	"github.com/ianremmler/flit"
 )
 
@@ -20,8 +22,7 @@ flit init              Initialize new issue tracker
 flit new               Create new issue
 flit id [<spec>]       List ids, optionally filtering by key/value
 flit show [<spec>]     Show issue (default: current)
-flit edit [<id>]       Edit issue (default: current)
-flit attach <file(s)>  Attach file to current issue`
+flit edit <id>         Edit issue`
 
 var (
 	args = os.Args[1:]
@@ -54,8 +55,6 @@ func main() {
 		setCmd()
 	case "edit":
 		editCmd()
-	// case "attach":
-	// attachCmd()
 	default:
 		log.Fatalln(cmd + " is not a valid command\n\n" + usage)
 	}
@@ -73,13 +72,9 @@ func initCmd() {
 
 func newCmd() {
 	id, err := it.NewIssue()
-	if err != nil {
-		log.Fatalf("new: %s\n", err)
-	}
+	checkErr("new", err)
 	err = it.AppendIssues()
-	if err != nil {
-		log.Fatalf("new: %s\n", err)
-	}
+	checkErr("new", err)
 	fmt.Println(id)
 }
 
@@ -91,7 +86,7 @@ func stateCmd() {
 }
 
 func idCmd() {
-	loadIssues()
+	loadIssues("id")
 	for _, id := range specIds(args) {
 		if it.Issue(id) != nil {
 			fmt.Println(id)
@@ -100,62 +95,95 @@ func idCmd() {
 }
 
 func showCmd() {
-	loadIssues()
+	loadIssues("show")
 	for _, id := range specIds(args) {
 		fmt.Println(it.Issue(id))
 	}
 }
 
 func setCmd() {
-	// verifyRepo()
-	// if len(args) < 2 {
-	// log.Fatalln("set: You must specify a key and value")
-	// }
-	// if !it.SetWorkingValue(args[0], args[1]) {
-	// log.Fatalln("set: Error setting value")
-	// }
+	loadIssues("set")
+	if len(args) < 3 {
+		log.Fatalln("set: You must specify a valid issue id, key, and value")
+	}
+	id, key, val := args[0], args[1], args[2]
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalln("set: Error finding issue")
+	}
+	flit.Set(issue, key, val)
+	storeIssues("set")
 }
 
 func editCmd() {
-	// editor := os.Getenv("VISUAL")
-	// if editor == "" {
-	// editor = os.Getenv("EDITOR")
-	// }
-	// if editor == "" {
-	// log.Fatalln("VISUAL or EDITOR environment variable must be set")
-	// }
-	// verifyRepo()
-	// id := it.CurrentIssue()
-	// isCur := true
-	// if len(args) > 0 {
-	// id = gitit.FormatId(args[0])
-	// isCur = false
-	// }
-	// verifyIssue(id)
-	// if !isCur {
-	// err := it.OpenIssue(id)
-	// if err != nil {
-	// log.Fatalln("edit: Unable to open issue " + id)
-	// }
-	// }
-	// cmd := exec.Command(editor, it.IssueFilename())
-	// cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	// err := cmd.Run()
-	// if err != nil {
-	// log.Fatalln(err)
-	// }
-}
+	editor := os.Getenv("VISUAL")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	if editor == "" {
+		log.Fatalln("VISUAL or EDITOR environment variable must be set")
+	}
+	if len(args) < 1 {
+		log.Fatalln("edit: You must specify a valid issue id")
+	}
 
-func attachCmd() {
-	// if len(args) == 0 {
-	// log.Fatalln("attach: You must specify a file to attach")
-	// }
-	// verifyRepo()
-	// for i := range args {
-	// if it.AttachFile(args[i]) != nil {
-	// log.Fatalln("attach: Error attaching " + args[i])
-	// }
-	// }
+	// get the issue
+	loadIssues("edit")
+	id := args[0]
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalln("edit: Error finding issue")
+	}
+
+	// write the issue to a temp file
+	filename := os.TempDir() + "/issue-" + id
+	issueFile, err := os.Create(filename)
+	checkErr("edit", err)
+	fmt.Fprintln(issueFile, issue)
+	issueFile.Close()
+
+	// get original file state
+	origStat, err := os.Stat(filename)
+	checkErr("edit", err)
+
+	// launch editor
+	cmd := exec.Command(editor, filename)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	err = cmd.Run()
+	checkErr("edit", err)
+
+	// get updated file state, compare to original
+	newStat, err := os.Stat(filename)
+	checkErr("edit", err)
+	if newStat.ModTime() == origStat.ModTime() {
+		log.Fatalln("edit: Issue unchanged")
+	}
+
+	// parse issue from temp file
+	issueFile, err = os.Open(filename)
+	checkErr("edit", err)
+	defer issueFile.Close()
+	edited := dgrl.NewParser().Parse(issueFile)
+	if edited == nil {
+		log.Fatalln("edit: Error parsing issue")
+	}
+
+	// update issue if we find a match
+	didUpdate := false
+	for _, node := range edited.Kids() {
+		if node.Type() == dgrl.BranchType && node.Key() == id {
+			if editedIssue, ok := node.(*dgrl.Branch); ok {
+				*issue = *editedIssue
+				didUpdate = true
+				break
+			}
+		}
+	}
+	if !didUpdate {
+		log.Fatalln("edit: Error updating issue")
+	}
+
+	storeIssues("edit")
 }
 
 // func stateSummary(id string) string {
@@ -198,9 +226,18 @@ func specIds(args []string) []string {
 	return ids
 }
 
-func loadIssues() {
+func loadIssues(cmd string) {
 	err := it.Load()
+	checkErr(cmd, err)
+}
+
+func storeIssues(cmd string) {
+	err := it.Store()
+	checkErr(cmd, err)
+}
+
+func checkErr(cmd string, err error) {
 	if err != nil {
-		log.Fatalf("show: %s\n", err)
+		log.Fatalf("%s: %s\n", cmd, err)
 	}
 }

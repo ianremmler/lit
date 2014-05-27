@@ -31,10 +31,10 @@ func (f *Flit) InitFile() error {
 
 func (f *Flit) Load() error {
 	issueFile, err := os.Open("issues")
-	defer issueFile.Close()
 	if err != nil {
 		return err
 	}
+	defer issueFile.Close()
 	issues := dgrl.NewParser().Parse(issueFile)
 	if issues == nil {
 		return errors.New("error parsing issue file")
@@ -111,49 +111,12 @@ func (f *Flit) Issue(id string) *dgrl.Branch {
 	return nil
 }
 
-// func (f *Flit) SetWorkingValue(key, val string) bool {
-// data, err := ioutil.ReadFile(f.issueFilename)
-// if err != nil {
-// return false
-// }
-// parser := dgrl.NewParser()
-// tree := parser.Parse(strings.NewReader(string(data)))
-// for _, node := range tree.Kids() {
-// if leaf, ok := node.(*dgrl.Leaf); ok {
-// if leaf.Key() == key {
-// leaf.SetValue(val)
-// issueFile, err := os.Create(f.issueFilename)
-// if err != nil {
-// return false
-// }
-// issueFile.WriteString(tree.String())
-// issueFile.Close()
-// return true
-// }
-// }
-// }
-// return false
-// }
-
-func (f *Flit) Set(id, key, val string, doesMatch bool) []string {
-	matches := []string{}
-
-	for _, node := range f.issues.Kids() {
-		if issue, ok := node.(*dgrl.Branch); ok {
-			if issueContains(issue, key, val) {
-				matches = append(matches, issue.Key())
-			}
-		}
-	}
-	return matches
-}
-
 func (f *Flit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
 
 	for _, node := range f.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
-			if issueContains(issue, key, val) {
+			if IssueContains(issue, key, val) {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -161,7 +124,7 @@ func (f *Flit) Match(key, val string, doesMatch bool) []string {
 	return matches
 }
 
-func issueContains(issue *dgrl.Branch, key, val string) bool {
+func IssueContains(issue *dgrl.Branch, key, val string) bool {
 	for _, kid := range issue.Kids() {
 		if leaf, ok := kid.(*dgrl.Leaf); ok {
 			if strings.Contains(leaf.Key(), key) && strings.Contains(leaf.Value(), val) {
@@ -172,52 +135,19 @@ func issueContains(issue *dgrl.Branch, key, val string) bool {
 	return false
 }
 
-// if key == "" {
-// return true
-// }
-// parser := dgrl.NewParser()
-// tree := parser.Parse(strings.NewReader(f.IssueText(id)))
-// for _, node := range tree.Kids() {
-// if leaf, ok := node.(*dgrl.Leaf); ok {
-// if strings.Contains(leaf.Key(), key) && strings.Contains(leaf.Value(), val) {
-// return true
-// }
-// }
-// }
-// return false
-// }
-
-// func (f *Flit) ToDgrl(ids []string) *dgrl.Branch {
-// parser := dgrl.NewParser()
-// root := dgrl.NewRoot()
-// for _, id := range ids {
-// issue := dgrl.NewBranch(FormatId(id))
-// tree := parser.Parse(strings.NewReader(f.IssueText(id)))
-// for _, kid := range tree.Kids() {
-// issue.Append(kid)
-// }
-// root.Append(issue)
-// }
-// return root
-// }
-
-// func (f *Flit) Attachments(id string) []string {
-// repo := gitgo.New()
-// branch := ""
-// if id != "" {
-// branch = f.IdToBranch(id)
-// }
-// att, err := repo.Run("diff", "--name-only", "--diff-filter=A", "master", branch)
-// if err != nil {
-// return []string{}
-// }
-// attList := strings.Split(strings.TrimSpace(att), "\n")
-// // Split returns slice with 1 empty string on empty input, so just return empty slice
-// if len(attList) == 1 && attList[0] == "" {
-// return []string{}
-// }
-// return attList
-// }
+func Set(issue *dgrl.Branch, key, val string) {
+	for _, kid := range issue.Kids() {
+		if leaf, ok := kid.(*dgrl.Leaf); ok {
+			if leaf.Key() == key {
+				leaf.SetValue(val)
+				return
+			}
+		}
+	}
+	// didn't find leaf, so create one
+	issue.Append(dgrl.NewLeaf(key, val))
+	return
+}
 
 func curTime() string {
 	return time.Now().Format(time.RFC3339)
