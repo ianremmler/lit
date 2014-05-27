@@ -1,4 +1,4 @@
-package flit
+package lit
 
 import (
 	"errors"
@@ -12,15 +12,15 @@ import (
 	"github.com/ianremmler/dgrl"
 )
 
-type Flit struct {
+type Lit struct {
 	issues *dgrl.Branch
 }
 
-func New() *Flit {
-	return &Flit{issues: dgrl.NewRoot()}
+func New() *Lit {
+	return &Lit{issues: dgrl.NewRoot()}
 }
 
-func (f *Flit) InitFile() error {
+func (l *Lit) InitFile() error {
 	issueFile, err := os.OpenFile("issues", os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func (f *Flit) InitFile() error {
 	return nil
 }
 
-func (f *Flit) Load() error {
+func (l *Lit) Load() error {
 	issueFile, err := os.Open("issues")
 	if err != nil {
 		return err
@@ -39,42 +39,42 @@ func (f *Flit) Load() error {
 	if issues == nil {
 		return errors.New("error parsing issue file")
 	}
-	f.issues = issues
+	l.issues = issues
 	return nil
 }
 
-func (f *Flit) Store() error {
-	if f.issues == nil {
+func (l *Lit) Store() error {
+	if l.issues == nil {
 		return errors.New("issues not initialized")
 	}
 	issueFile, err := os.Create("issues")
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(issueFile, f.issues)
+	fmt.Fprintln(issueFile, l.issues)
 	issueFile.Close()
 	return nil
 }
 
-func (f *Flit) AppendIssues() error {
-	if f.issues == nil {
+func (l *Lit) AppendIssues() error {
+	if l.issues == nil {
 		return errors.New("issues not initialized")
 	}
 	issueFile, err := os.OpenFile("issues", os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(issueFile, f.issues)
+	fmt.Fprintln(issueFile, l.issues)
 	issueFile.Close()
 	return nil
 }
 
-func (f *Flit) IssueIds() []string {
-	if f.issues == nil {
+func (l *Lit) IssueIds() []string {
+	if l.issues == nil {
 		return []string{}
 	}
 	issueIds := []string{}
-	for _, node := range f.issues.Kids() {
+	for _, node := range l.issues.Kids() {
 		if node.Type() == dgrl.BranchType {
 			issueIds = append(issueIds, node.Key())
 		}
@@ -82,8 +82,8 @@ func (f *Flit) IssueIds() []string {
 	return issueIds
 }
 
-func (f *Flit) NewIssue() (string, error) {
-	if f.issues == nil {
+func (l *Lit) NewIssue() (string, error) {
+	if l.issues == nil {
 		return "", errors.New("issues not initialized")
 	}
 	id := uuid.New()
@@ -97,13 +97,13 @@ func (f *Flit) NewIssue() (string, error) {
 	issue.Append(dgrl.NewLeaf("priority", ""))
 	issue.Append(dgrl.NewLeaf("assigned", ""))
 	issue.Append(dgrl.NewLongLeaf("description", "\n"))
-	f.issues.Append(issue)
+	l.issues.Append(issue)
 
 	return id, nil
 }
 
-func (f *Flit) Issue(id string) *dgrl.Branch {
-	for _, node := range f.issues.Kids() {
+func (l *Lit) Issue(id string) *dgrl.Branch {
+	for _, node := range l.issues.Kids() {
 		if node.Type() == dgrl.BranchType && node.Key() == id {
 			return node.(*dgrl.Branch)
 		}
@@ -111,9 +111,9 @@ func (f *Flit) Issue(id string) *dgrl.Branch {
 	return nil
 }
 
-func (f *Flit) Match(key, val string, doesMatch bool) []string {
+func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
-	for _, node := range f.issues.Kids() {
+	for _, node := range l.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
 			if IssueContains(issue, key, val) == doesMatch {
 				matches = append(matches, issue.Key())

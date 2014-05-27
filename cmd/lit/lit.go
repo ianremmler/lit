@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ianremmler/dgrl"
-	"github.com/ianremmler/flit"
+	"github.com/ianremmler/lit"
 )
 
 const usage = `usage:
@@ -16,25 +16,25 @@ const usage = `usage:
 spec: . | all | <id(s)> | (with|without) <field> [<val>]
 	'.' indicates the currently open issue
 
-flit [help | usage]          Show usage
-flit list <spec>             Show list of issues matching spec
-flit init                    Initialize new issue tracker
-flit new                     Create new issue
-flit id <spec>               List ids matching spec
-flit show <spec>             Show issues matching spec
-flit set <id> <field> <val>  Set issue field
-flit edit <id>               Edit issue
-flit close <id>              Close issue
-flit reopen <id>             Reopen closed issue`
+lit [help | usage]          Show usage
+lit list <spec>             Show list of issues matching spec
+lit init                    Initialize new issue tracker
+lit new                     Create new issue
+lit id <spec>               List ids matching spec
+lit show <spec>             Show issues matching spec
+lit set <id> <field> <val>  Set issue field
+lit edit <id>               Edit issue
+lit close <id>              Close issue
+lit reopen <id>             Reopen closed issue`
 
 var (
 	args = os.Args[1:]
-	it   = flit.New()
+	it   = lit.New()
 )
 
 func main() {
 	log.SetFlags(0)
-	log.SetPrefix("flit: ")
+	log.SetPrefix("lit: ")
 
 	cmd := ""
 	if len(args) > 0 {
@@ -123,8 +123,8 @@ func setCmd() {
 	if issue == nil {
 		log.Fatalln("set: Error finding issue")
 	}
-	ok := flit.Set(issue, key, val)
-	ok = ok && flit.Set(issue, "updated", flit.Stamp())
+	ok := lit.Set(issue, key, val)
+	ok = ok && lit.Set(issue, "updated", lit.Stamp())
 	if !ok {
 		log.Fatalln("set: Error updating issue fields")
 	}
@@ -147,7 +147,7 @@ func editCmd() {
 	id := args[0]
 	loadIssues("edit")
 	issue := it.Issue(id)
-	if !flit.Set(issue, "updated", flit.Stamp()) {
+	if !lit.Set(issue, "updated", lit.Stamp()) {
 		log.Fatalln("edit: Error setting update time")
 	}
 	if issue == nil {
@@ -215,10 +215,10 @@ func closeCmd() {
 	if issue == nil {
 		log.Fatalln("close: Error finding issue")
 	}
-	stamp := flit.Stamp()
-	ok := flit.Set(issue, "status", "closed")
-	ok = ok && flit.Set(issue, "closed", stamp)
-	ok = ok && flit.Set(issue, "updated", stamp)
+	stamp := lit.Stamp()
+	ok := lit.Set(issue, "status", "closed")
+	ok = ok && lit.Set(issue, "closed", stamp)
+	ok = ok && lit.Set(issue, "updated", stamp)
 	if !ok {
 		log.Fatalln("close: Error updating issue fields")
 	}
@@ -235,9 +235,9 @@ func reopenCmd() {
 	if issue == nil {
 		log.Fatalln("reopen: Error finding issue")
 	}
-	ok := flit.Set(issue, "status", "open")
-	ok = ok && flit.Set(issue, "closed", "")
-	ok = ok && flit.Set(issue, "updated", flit.Stamp())
+	ok := lit.Set(issue, "status", "open")
+	ok = ok && lit.Set(issue, "closed", "")
+	ok = ok && lit.Set(issue, "updated", lit.Stamp())
 	if !ok {
 		log.Fatalln("reopen: Error updating issue fields")
 	}
@@ -245,11 +245,11 @@ func reopenCmd() {
 }
 
 func listInfo(id string, issue *dgrl.Branch) string {
-	status, _ := flit.Get(issue, "status")
-	typ, _ := flit.Get(issue, "type")
-	priority, _ := flit.Get(issue, "priority")
-	assigned, _ := flit.Get(issue, "assigned")
-	summary, _ := flit.Get(issue, "summary")
+	status, _ := lit.Get(issue, "status")
+	typ, _ := lit.Get(issue, "type")
+	priority, _ := lit.Get(issue, "priority")
+	assigned, _ := lit.Get(issue, "assigned")
+	summary, _ := lit.Get(issue, "summary")
 	return fmt.Sprintf("%s %-7.7s %-7.7s %-7.7s %-7.7s %s",
 		id, status, typ, priority, assigned, summary)
 }
