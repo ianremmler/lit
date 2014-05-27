@@ -137,6 +137,9 @@ func Get(issue *dgrl.Branch, key string) (string, bool) {
 
 func Contains(issue *dgrl.Branch, key, val string) bool {
 	if issueVal, ok := Get(issue, key); ok {
+		if val == "" && issueVal == "" {
+			return false
+		}
 		if strings.Contains(issueVal, val) {
 			return true
 		}
