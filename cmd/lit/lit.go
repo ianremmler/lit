@@ -24,6 +24,7 @@ lit new                       Create new issue
 lit id <spec>                 List ids in spec
 lit show <spec>               Show issues in spec
 lit set <field> <val> <spec>  Set issue field
+lit comment <id> [<comment>]  Add issue comment (launches editor if no comment given)
 lit edit <spec>               Edit issues in spec
 lit close <spec>              Close issues in spec
 lit reopen <spec>             Reopen closed issues in spec`
@@ -63,6 +64,8 @@ func main() {
 		showCmd()
 	case "set":
 		setCmd()
+	case "comment":
+		commentCmd()
 	case "edit":
 		editCmd()
 	case "close", "reopen":
@@ -141,12 +144,9 @@ func setCmd() {
 }
 
 func editCmd() {
-	editor := os.Getenv("VISUAL")
+	editor := getEditor()
 	if editor == "" {
-		editor = os.Getenv("EDITOR")
-	}
-	if editor == "" {
-		log.Fatalln("VISUAL or EDITOR environment variable must be set")
+		log.Fatalln("edit: VISUAL or EDITOR environment variable must be set\n")
 	}
 	if len(args) < 1 {
 		log.Fatalln("edit: You must specify a spec to edit")
@@ -252,6 +252,61 @@ func closeCmd(cmd string) {
 	storeIssues(cmd)
 }
 
+func commentCmd() {
+	if len(args) < 1 {
+		log.Fatalln("comment: You must specify an issue to comment on")
+	}
+	id := args[0]
+	loadIssues("comment")
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalf("comment: Error finding issue %s\n", id)
+	}
+	comment := ""
+	if len(args) > 1 {
+		comment = args[1]
+	} else {
+		comment = editComment()
+	}
+	commentBranch := dgrl.NewBranch(lit.Stamp())
+	commentBranch.Append(dgrl.NewLongLeaf("", comment))
+	issue.Append(commentBranch)
+	storeIssues("comment")
+}
+
+func editComment() string {
+	editor := getEditor()
+	if editor == "" {
+		log.Fatalln("comment: VISUAL or EDITOR environment variable must be set\n")
+	}
+	// create temp file
+	tempFile, err := ioutil.TempFile("", "lit-")
+	checkErr("comment", err)
+	filename := tempFile.Name()
+
+	// get original file state
+	origStat, err := os.Stat(filename)
+	checkErr("comment", err)
+
+	// launch editor
+	cmd := exec.Command(editor, filename)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	err = cmd.Run()
+	checkErr("comment", err)
+
+	// get updated file state, compare to original
+	newStat, err := os.Stat(filename)
+	checkErr("comment", err)
+	if newStat.ModTime() == origStat.ModTime() {
+		log.Fatalln("comment: File unchanged")
+	}
+
+	// read comment from file
+	commentData, err := ioutil.ReadFile(filename)
+	checkErr("comment", err)
+	return string(commentData)
+}
+
 func listInfo(id string, issue *dgrl.Branch) string {
 	status := " "
 	closed, _ := lit.Get(issue, "closed")
@@ -325,4 +380,12 @@ func checkErr(cmd string, err error) {
 	if err != nil {
 		log.Fatalf("%s: %s\n", cmd, err)
 	}
+}
+
+func getEditor() string {
+	editor := os.Getenv("VISUAL")
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+	}
+	return editor
 }
