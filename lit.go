@@ -50,9 +50,11 @@ func (l *Lit) Store() error {
 	if err != nil {
 		return err
 	}
-
-	l.issues.Write(issueFile)
-	issueFile.Close()
+	defer issueFile.Close()
+	err = l.issues.Write(issueFile)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
