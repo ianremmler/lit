@@ -86,10 +86,10 @@ func initCmd() {
 }
 
 func newCmd() {
+	loadIssues("new")
 	id, err := it.NewIssue()
 	checkErr("new", err)
-	err = it.AppendIssues()
-	checkErr("new", err)
+	storeIssues("new")
 	fmt.Println(id)
 }
 

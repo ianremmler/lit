@@ -2,7 +2,6 @@ package lit
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"os/user"
 	"strings"
@@ -51,20 +50,8 @@ func (l *Lit) Store() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(issueFile, l.issues)
-	issueFile.Close()
-	return nil
-}
 
-func (l *Lit) AppendIssues() error {
-	if l.issues == nil {
-		return errors.New("issues not initialized")
-	}
-	issueFile, err := os.OpenFile("issues", os.O_RDWR|os.O_APPEND, 0666)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(issueFile, l.issues)
+	l.issues.Write(issueFile)
 	issueFile.Close()
 	return nil
 }
