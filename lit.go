@@ -104,7 +104,7 @@ func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
 	for _, node := range l.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
-			if hasPrefix(issue, key, val) == doesMatch {
+			if contains(issue, key, val) == doesMatch {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -150,12 +150,12 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 	return false
 }
 
-func hasPrefix(issue *dgrl.Branch, key, val string) bool {
+func contains(issue *dgrl.Branch, key, val string) bool {
 	if issueVal, ok := Get(issue, key); ok {
 		if val == "" && issueVal == "" {
 			return false
 		}
-		if strings.HasPrefix(issueVal, val) {
+		if strings.Contains(issueVal, val) {
 			return true
 		}
 	}
