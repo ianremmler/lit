@@ -14,17 +14,16 @@ import (
 
 const usage = `usage:
 
-spec: . | all | <id(s)> | (with|without) <field> [<val>]
-	'.' indicates the currently open issue
+spec: all | <ids> | (with|without) <field> [<val>] | (less|greater) <field> <val>
 
 lit [help | usage]            Show usage
-lit list <spec>               Show list of issues in spec
 lit init                      Initialize new issue tracker
 lit new                       Create new issue
+lit list <spec>               Show summary list of issues in spec
 lit id <spec>                 List ids in spec
 lit show <spec>               Show issues in spec
 lit set <field> <val> <spec>  Set issue field
-lit comment <id> [<comment>]  Add issue comment (launches editor if no comment given)
+lit comment <id> [<text>]     Add issue comment (opens editor if no text given)
 lit edit <spec>               Edit issues in spec
 lit close <spec>              Close issues in spec
 lit reopen <spec>             Reopen closed issues in spec`
