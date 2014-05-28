@@ -14,8 +14,6 @@ import (
 
 const usage = `usage:
 
-spec: all | <ids> | (with|without) <field> [<val>] | (less|greater) <field> <val>
-
 lit [help | usage]            Show usage
 lit init                      Initialize new issue tracker
 lit new                       Create new issue
@@ -26,7 +24,10 @@ lit set <field> <val> <spec>  Set issue field
 lit comment <id> [<text>]     Add issue comment (opens editor if no text given)
 lit edit <spec>               Edit issues in spec
 lit close <spec>              Close issues in spec
-lit reopen <spec>             Reopen closed issues in spec`
+lit reopen <spec>             Reopen closed issues in spec
+
+spec: all | <ids> | (with|without) <field> [<val>] | (less|greater) <field> <val>
+      If field is comment, compare contents or timestamps based on search type`
 
 // id, closed?, priority, assigned, tags, summary
 const listFmt = "%-8.8s %-1.1s %-1.1s %-8.8s %-17.17s %s"

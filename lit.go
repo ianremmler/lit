@@ -63,9 +63,9 @@ func (l *Lit) IssueIds() []string {
 		return []string{}
 	}
 	issueIds := []string{}
-	for _, node := range l.issues.Kids() {
-		if node.Type() == dgrl.BranchType {
-			issueIds = append(issueIds, node.Key())
+	for _, k := range l.issues.Kids() {
+		if issue, ok := k.(*dgrl.Branch); ok {
+			issueIds = append(issueIds, issue.Key())
 		}
 	}
 	return issueIds
@@ -92,9 +92,9 @@ func (l *Lit) NewIssue() (string, error) {
 }
 
 func (l *Lit) Issue(id string) *dgrl.Branch {
-	for _, node := range l.issues.Kids() {
-		if node.Type() == dgrl.BranchType && strings.HasPrefix(node.Key(), id) {
-			return node.(*dgrl.Branch)
+	for _, k := range l.issues.Kids() {
+		if issue, ok := k.(*dgrl.Branch); ok && strings.HasPrefix(issue.Key(), id) {
+			return issue
 		}
 	}
 	return nil
@@ -102,8 +102,8 @@ func (l *Lit) Issue(id string) *dgrl.Branch {
 
 func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
-	for _, node := range l.issues.Kids() {
-		if issue, ok := node.(*dgrl.Branch); ok {
+	for _, k := range l.issues.Kids() {
+		if issue, ok := k.(*dgrl.Branch); ok {
 			if contains(issue, key, val) == doesMatch {
 				matches = append(matches, issue.Key())
 			}
@@ -117,9 +117,9 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 	if val == "" {
 		return matches
 	}
-	for _, node := range l.issues.Kids() {
-		if issue, ok := node.(*dgrl.Branch); ok {
-			if less(issue, key, val, !isLess) == isLess {
+	for _, k := range l.issues.Kids() {
+		if issue, ok := k.(*dgrl.Branch); ok {
+			if compare(issue, key, val, isLess) == isLess {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -128,8 +128,8 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 }
 
 func Get(issue *dgrl.Branch, key string) (string, bool) {
-	for _, kid := range issue.Kids() {
-		if leaf, ok := kid.(*dgrl.Leaf); ok {
+	for _, k := range issue.Kids() {
+		if leaf, ok := k.(*dgrl.Leaf); ok {
 			if strings.HasPrefix(leaf.Key(), key) {
 				return leaf.Value(), true
 			}
@@ -139,8 +139,8 @@ func Get(issue *dgrl.Branch, key string) (string, bool) {
 }
 
 func Set(issue *dgrl.Branch, key, val string) bool {
-	for _, kid := range issue.Kids() {
-		if leaf, ok := kid.(*dgrl.Leaf); ok {
+	for _, k := range issue.Kids() {
+		if leaf, ok := k.(*dgrl.Leaf); ok {
 			if strings.HasPrefix(leaf.Key(), key) {
 				leaf.SetValue(val)
 				return true
@@ -151,6 +151,9 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 }
 
 func contains(issue *dgrl.Branch, key, val string) bool {
+	if key == "comment" {
+		return commentContains(issue, val)
+	}
 	if issueVal, ok := Get(issue, key); ok {
 		if val == "" && issueVal == "" {
 			return false
@@ -162,17 +165,46 @@ func contains(issue *dgrl.Branch, key, val string) bool {
 	return false
 }
 
-func less(issue *dgrl.Branch, key, val string, incl bool) bool {
-	if issueVal, ok := Get(issue, key); ok {
-		if issueVal == "" {
-			return false
+func commentContains(issue *dgrl.Branch, val string) bool {
+	for _, k := range issue.Kids() {
+		if comment, ok := k.(*dgrl.Branch); ok {
+			for _, kk := range comment.Kids() {
+				if leaf, ok := kk.(*dgrl.Leaf); ok {
+					if strings.Contains(leaf.Value(), val) {
+						return true
+					}
+				}
+			}
 		}
-		if incl {
-			return issueVal <= val
-		}
-		return issueVal < val
 	}
 	return false
+}
+
+func compare(issue *dgrl.Branch, key, val string, isLess bool) bool {
+	if key == "comment" {
+		return commentCompare(issue, val, isLess)
+	}
+	issueVal, ok := Get(issue, key)
+	if !ok || issueVal == "" {
+		return !isLess
+	}
+	if isLess {
+		return issueVal < val
+	}
+	return issueVal <= val
+}
+
+func commentCompare(issue *dgrl.Branch, time string, isLess bool) bool {
+	for _, k := range issue.Kids() {
+		if comment, ok := k.(*dgrl.Branch); ok {
+			commentTime := comment.Key()
+			if isLess {
+				return commentTime < time
+			}
+			return commentTime <= time
+		}
+	}
+	return !isLess
 }
 
 func curTime() string {
