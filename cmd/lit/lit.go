@@ -265,7 +265,7 @@ func commentCmd() {
 		comment = editComment()
 	}
 	commentBranch := dgrl.NewBranch(lit.Stamp())
-	commentBranch.Append(dgrl.NewLongLeaf("", comment))
+	commentBranch.Append(dgrl.NewText(comment))
 	issue.Append(commentBranch)
 	storeIssues("comment")
 }
