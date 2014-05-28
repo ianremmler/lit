@@ -69,7 +69,7 @@ func main() {
 	case "close", "reopen":
 		closeCmd(cmd)
 	default:
-		log.Fatalln(cmd + " is not a valid command\n\n" + usage)
+		log.Fatalln(cmd + " is not a valid command")
 	}
 }
 
@@ -78,9 +78,8 @@ func usageCmd() {
 }
 
 func initCmd() {
-	if it.Init() != nil {
-		log.Fatalln("init: Error initializing issue tracker")
-	}
+	err := it.Init()
+	checkErr("init", err)
 }
 
 func newCmd() {
@@ -120,7 +119,7 @@ func showCmd() {
 
 func setCmd() {
 	if len(args) < 3 {
-		log.Fatalln("set: You must specify a field, and value, and spec")
+		log.Fatalln("set: you must specify a field, value, and spec")
 	}
 	key, val, spec := args[0], args[1], args[2:]
 	loadIssues("set")
@@ -128,13 +127,13 @@ func setCmd() {
 	for _, id := range specIds(spec) {
 		issue := it.Issue(id)
 		if issue == nil {
-			log.Printf("set: Error finding issue %s\n", id)
+			log.Printf("set: error finding issue %s\n", id)
 			continue
 		}
 		ok := lit.Set(issue, key, val)
 		ok = ok && lit.Set(issue, "updated", stamp)
 		if !ok {
-			log.Printf("set: Error updating fields in %s\n", id)
+			log.Printf("set: error updating fields in issue %s\n", id)
 			continue
 		}
 	}
@@ -144,10 +143,10 @@ func setCmd() {
 func editCmd() {
 	editor := getEditor()
 	if editor == "" {
-		log.Fatalln("edit: VISUAL or EDITOR environment variable must be set\n")
+		log.Fatalln("edit: VISUAL or EDITOR environment variable must be set")
 	}
 	if len(args) < 1 {
-		log.Fatalln("edit: You must specify a spec to edit")
+		log.Fatalln("edit: you must specify a spec to edit")
 	}
 
 	loadIssues("edit")
@@ -162,11 +161,11 @@ func editCmd() {
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue == nil {
-			log.Printf("edit: Error finding issue %s\n")
+			log.Printf("edit: error finding issue %s\n", id)
 			continue
 		}
 		if !lit.Set(issue, "updated", lit.Stamp()) {
-			log.Printf("edit: Error setting update time for %s\n")
+			log.Printf("edit: error setting update time for issue %s\n", id)
 			continue
 		}
 		fmt.Fprintln(tempFile, issue)
@@ -187,7 +186,7 @@ func editCmd() {
 	newStat, err := os.Stat(filename)
 	checkErr("edit", err)
 	if newStat.ModTime() == origStat.ModTime() {
-		log.Fatalln("edit: File unchanged")
+		log.Fatalln("edit: file unchanged")
 	}
 
 	// parse issue from temp file
@@ -196,7 +195,7 @@ func editCmd() {
 	edited := dgrl.NewParser().Parse(tempFile)
 	tempFile.Close()
 	if edited == nil {
-		log.Fatalln("edit: Error parsing file")
+		log.Fatalln("edit: error parsing file")
 	}
 
 	// update issues if we find a match
@@ -218,7 +217,7 @@ func editCmd() {
 		}
 	}
 	if !didUpdate {
-		log.Fatalln("edit: Did not update anything")
+		log.Fatalln("edit: did not update anything")
 	}
 
 	storeIssues("edit")
@@ -226,14 +225,14 @@ func editCmd() {
 
 func closeCmd(cmd string) {
 	if len(args) < 1 {
-		log.Fatalf("%s: You must specify a spec\n", cmd)
+		log.Fatalf("%s: you must specify a spec\n", cmd)
 	}
 	loadIssues(cmd)
 	stamp := lit.Stamp()
 	for _, id := range specIds(args) {
 		issue := it.Issue(id)
 		if issue == nil {
-			log.Printf("%s: Error finding issue %s\n", cmd, id)
+			log.Printf("%s: error finding issue %s\n", cmd, id)
 			continue
 		}
 		closedStamp := ""
@@ -243,7 +242,7 @@ func closeCmd(cmd string) {
 		ok := lit.Set(issue, "closed", closedStamp)
 		ok = ok && lit.Set(issue, "updated", stamp)
 		if !ok {
-			log.Printf("%s: Error updating fields for %s\n", cmd, id)
+			log.Printf("%s: error updating fields for issue %s\n", cmd, id)
 			continue
 		}
 	}
@@ -252,13 +251,13 @@ func closeCmd(cmd string) {
 
 func commentCmd() {
 	if len(args) < 1 {
-		log.Fatalln("comment: You must specify an issue to comment on")
+		log.Fatalln("comment: you must specify an issue to comment on")
 	}
 	id := args[0]
 	loadIssues("comment")
 	issue := it.Issue(id)
 	if issue == nil {
-		log.Fatalf("comment: Error finding issue %s\n", id)
+		log.Fatalf("comment: error finding issue %s\n", id)
 	}
 	comment := ""
 	if len(args) > 1 {
@@ -275,7 +274,7 @@ func commentCmd() {
 func editComment() string {
 	editor := getEditor()
 	if editor == "" {
-		log.Fatalln("comment: VISUAL or EDITOR environment variable must be set\n")
+		log.Fatalln("comment: VISUAL or EDITOR environment variable must be set")
 	}
 	// create temp file
 	tempFile, err := ioutil.TempFile("", "lit-")
@@ -296,7 +295,7 @@ func editComment() string {
 	newStat, err := os.Stat(filename)
 	checkErr("comment", err)
 	if newStat.ModTime() == origStat.ModTime() {
-		log.Fatalln("comment: File unchanged")
+		log.Fatalln("comment: file unchanged")
 	}
 
 	// read comment from file

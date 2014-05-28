@@ -169,9 +169,8 @@ func less(issue *dgrl.Branch, key, val string, incl bool) bool {
 		}
 		if incl {
 			return issueVal <= val
-		} else {
-			return issueVal < val
 		}
+		return issueVal < val
 	}
 	return false
 }
