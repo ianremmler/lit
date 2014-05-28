@@ -19,7 +19,7 @@ func New() *Lit {
 	return &Lit{issues: dgrl.NewRoot()}
 }
 
-func (l *Lit) InitFile() error {
+func (l *Lit) Init() error {
 	issueFile, err := os.OpenFile("issues", os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
@@ -104,7 +104,7 @@ func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
 	for _, node := range l.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
-			if Contains(issue, key, val) == doesMatch {
+			if hasPrefix(issue, key, val) == doesMatch {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -119,7 +119,7 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 	}
 	for _, node := range l.issues.Kids() {
 		if issue, ok := node.(*dgrl.Branch); ok {
-			if Less(issue, key, val, !isLess) == isLess {
+			if less(issue, key, val, !isLess) == isLess {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -130,7 +130,7 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 func Get(issue *dgrl.Branch, key string) (string, bool) {
 	for _, kid := range issue.Kids() {
 		if leaf, ok := kid.(*dgrl.Leaf); ok {
-			if strings.Contains(leaf.Key(), key) {
+			if strings.HasPrefix(leaf.Key(), key) {
 				return leaf.Value(), true
 			}
 		}
@@ -138,19 +138,31 @@ func Get(issue *dgrl.Branch, key string) (string, bool) {
 	return "", false
 }
 
-func Contains(issue *dgrl.Branch, key, val string) bool {
+func Set(issue *dgrl.Branch, key, val string) bool {
+	for _, kid := range issue.Kids() {
+		if leaf, ok := kid.(*dgrl.Leaf); ok {
+			if strings.HasPrefix(leaf.Key(), key) {
+				leaf.SetValue(val)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasPrefix(issue *dgrl.Branch, key, val string) bool {
 	if issueVal, ok := Get(issue, key); ok {
 		if val == "" && issueVal == "" {
 			return false
 		}
-		if strings.Contains(issueVal, val) {
+		if strings.HasPrefix(issueVal, val) {
 			return true
 		}
 	}
 	return false
 }
 
-func Less(issue *dgrl.Branch, key, val string, incl bool) bool {
+func less(issue *dgrl.Branch, key, val string, incl bool) bool {
 	if issueVal, ok := Get(issue, key); ok {
 		if issueVal == "" {
 			return false
@@ -159,18 +171,6 @@ func Less(issue *dgrl.Branch, key, val string, incl bool) bool {
 			return issueVal <= val
 		} else {
 			return issueVal < val
-		}
-	}
-	return false
-}
-
-func Set(issue *dgrl.Branch, key, val string) bool {
-	for _, kid := range issue.Kids() {
-		if leaf, ok := kid.(*dgrl.Leaf); ok {
-			if strings.Contains(leaf.Key(), key) {
-				leaf.SetValue(val)
-				return true
-			}
 		}
 	}
 	return false

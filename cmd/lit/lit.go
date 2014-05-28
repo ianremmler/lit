@@ -29,15 +29,13 @@ lit edit <spec>               Edit issues in spec
 lit close <spec>              Close issues in spec
 lit reopen <spec>             Reopen closed issues in spec`
 
-const (
-	// id, stat, priority, assigned, tags, summary
-	listFmt = "%-8.8s %-1.1s %-1.1s %-6.6s %-16.16s %s"
-)
+// id, closed?, priority, assigned, tags, summary
+const listFmt = "%-8.8s %-1.1s %-1.1s %-8.8s %-17.17s %s"
 
 var (
 	args    = os.Args[1:]
 	it      = lit.New()
-	listHdr = fmt.Sprintf(listFmt, "id", "c", "p", "assign", "tags", "summary")
+	listHdr = fmt.Sprintf(listFmt, "id", "c", "p", "assigned", "tags", "summary")
 )
 
 func main() {
@@ -80,7 +78,7 @@ func usageCmd() {
 }
 
 func initCmd() {
-	if it.InitFile() != nil {
+	if it.Init() != nil {
 		log.Fatalln("init: Error initializing issue tracker")
 	}
 }
@@ -314,16 +312,13 @@ func listInfo(id string, issue *dgrl.Branch) string {
 		status = "*"
 	}
 	tags, _ := lit.Get(issue, "tags")
-	if len(tags) > 13 {
-		tags = tags[:10] + "..."
-	}
 	priority, _ := lit.Get(issue, "priority")
 	assigned, _ := lit.Get(issue, "assigned")
 	summary, _ := lit.Get(issue, "summary")
 	return fmt.Sprintf(listFmt, id, status, priority, assigned, tags, summary)
 }
 
-func matchIds(kv []string, doesMatch bool) []string {
+func keyval(kv []string) (string, string) {
 	key, val := "", ""
 	if len(kv) > 0 {
 		key = kv[0]
@@ -331,17 +326,16 @@ func matchIds(kv []string, doesMatch bool) []string {
 	if len(kv) > 1 {
 		val = kv[1]
 	}
+	return key, val
+}
+
+func matchIds(kv []string, doesMatch bool) []string {
+	key, val := keyval(kv)
 	return it.Match(key, val, doesMatch)
 }
 
 func compareIds(kv []string, isLess bool) []string {
-	key, val := "", ""
-	if len(kv) > 0 {
-		key = kv[0]
-	}
-	if len(kv) > 1 {
-		val = kv[1]
-	}
+	key, val := keyval(kv)
 	return it.Compare(key, val, isLess)
 }
 
