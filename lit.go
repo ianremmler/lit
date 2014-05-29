@@ -128,7 +128,7 @@ func (s *sorter) Swap(i, j int) {
 	s.vals[i], s.vals[j] = s.vals[j], s.vals[i]
 }
 
-func (l *Lit) Sort(key string, ids []string, doAscend bool) {
+func (l *Lit) Sort(ids []string, key string, doAscend bool) {
 	srt := newSorter(ids)
 	for i := range ids {
 		if issue := l.Issue(ids[i]); issue != nil {

@@ -17,15 +17,16 @@ const usage = `usage:
 lit [help | usage]             Show usage
 lit init                       Initialize new issue tracker
 lit new                        Create new issue
-lit list <spec>                Show summary list of issues in spec
-lit id <spec>                  List ids in spec
-lit sort|rsort <field> <spec>  Sort (rsort for reverse) ids in spec
-lit show <spec>                Show issues in spec
+lit list [<sort>] <spec>       Show summary list of issues in spec
+lit id [<sort>] <spec>         List ids in spec
+lit show [<sort>] <spec>       Show issues in spec
 lit set <field> <val> <spec>   Set issue field
 lit comment <id> [<text>]      Add issue comment (opens editor if no text given)
 lit edit <spec>                Edit issues in spec
 lit close <spec>               Close issues in spec
 lit reopen <spec>              Reopen closed issues in spec
+
+sort: (sort|rsort) <field>
 
 spec: all | <ids> | (with|without) <field> [<val>] | (less|greater) <field> <val>
       If field is comment, compare contents or timestamps based on search type`
@@ -69,8 +70,6 @@ func main() {
 		editCmd()
 	case "close", "reopen":
 		closeCmd(cmd)
-	case "sort", "rsort":
-		sortCmd(cmd)
 	default:
 		log.Fatalln(cmd + " is not a valid command")
 	}
@@ -95,8 +94,13 @@ func newCmd() {
 
 func listCmd() {
 	loadIssues("list")
+	doSort, field, doAscend := dispOpts("list")
+	ids := specIds()
+	if doSort {
+		it.Sort(ids, field, doAscend)
+	}
 	fmt.Println(listHdr)
-	for _, id := range specIds(args) {
+	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue != nil {
 			fmt.Println(listInfo(id, issue))
@@ -106,28 +110,26 @@ func listCmd() {
 
 func idCmd() {
 	loadIssues("id")
-	for _, id := range specIds(args) {
+	doSort, field, doAscend := dispOpts("id")
+	ids := specIds()
+	if doSort {
+		it.Sort(ids, field, doAscend)
+	}
+	for _, id := range ids {
 		if it.Issue(id) != nil {
 			fmt.Println(id)
 		}
 	}
 }
 
-func sortCmd(cmd string) {
-	if len(args) < 1 {
-		log.Fatalln("sort: you must specify a field to sort by")
-	}
-	loadIssues(cmd)
-	ids := specIds(args[1:])
-	it.Sort(args[0], ids, cmd == "sort")
-	for _, id := range ids {
-		fmt.Println(id)
-	}
-}
-
 func showCmd() {
 	loadIssues("show")
-	for _, id := range specIds(args) {
+	doSort, field, doAscend := dispOpts("show")
+	ids := specIds()
+	if doSort {
+		it.Sort(ids, field, doAscend)
+	}
+	for _, id := range ids {
 		fmt.Println(it.Issue(id))
 	}
 }
@@ -136,10 +138,11 @@ func setCmd() {
 	if len(args) < 3 {
 		log.Fatalln("set: you must specify a field, value, and spec")
 	}
-	key, val, spec := args[0], args[1], args[2:]
+	key, val := args[0], args[1]
+	args = args[2:]
 	loadIssues("set")
 	stamp := lit.Stamp()
-	for _, id := range specIds(spec) {
+	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("set: error finding issue %s\n", id)
@@ -172,7 +175,7 @@ func editCmd() {
 	filename := tempFile.Name()
 
 	// load issue content into temp file
-	ids := specIds(args)
+	ids := specIds()
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue == nil {
@@ -244,7 +247,7 @@ func closeCmd(cmd string) {
 	}
 	loadIssues(cmd)
 	stamp := lit.Stamp()
-	for _, id := range specIds(args) {
+	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("%s: error finding issue %s\n", cmd, id)
@@ -353,7 +356,24 @@ func compareIds(kv []string, isLess bool) []string {
 	return it.Compare(key, val, isLess)
 }
 
-func specIds(args []string) []string {
+func dispOpts(cmd string) (bool, string, bool) {
+	switch {
+	case len(args) == 0:
+		return false, "", true
+	case args[0] == "sortby" || args[0] == "rsortby":
+		if len(args) < 2 {
+			log.Fatalf("%s: sort requested, but no field given to sort by\n", cmd)
+		}
+		doSort := true
+		doAscend := (args[0] == "sortby")
+		field := args[1]
+		args = args[2:]
+		return doSort, field, doAscend
+	}
+	return false, "", true
+}
+
+func specIds() []string {
 	ids := []string{}
 	switch {
 	case len(args) == 0:
