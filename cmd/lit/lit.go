@@ -45,6 +45,14 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("lit: ")
 
+	// append args piped in from stdin
+	if stat, err := os.Stdin.Stat(); err == nil && stat.Mode()&os.ModeNamedPipe != 0 {
+		if stdin, err := ioutil.ReadAll(os.Stdin); err == nil {
+			stdinArgs := strings.Fields(string(stdin))
+			args = append(args, stdinArgs...)
+		}
+	}
+
 	if len(args) > 0 {
 		cmd = args[0]
 		args = args[1:]
