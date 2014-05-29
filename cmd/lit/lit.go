@@ -14,22 +14,22 @@ import (
 
 const usage = `usage:
 
-lit [help | usage]             Show usage
-lit init                       Initialize new issue tracker
-lit new                        Create new issue
-lit list [<sort>] <spec>       Show summary list of issues in spec
-lit id [<sort>] <spec>         List ids in spec
-lit show [<sort>] <spec>       Show issues in spec
-lit set <field> <val> <spec>   Set issue field
-lit comment <id> [<text>]      Add issue comment (opens editor if no text given)
-lit edit <spec>                Edit issues in spec
-lit close <spec>               Close issues in spec
-lit reopen <spec>              Reopen closed issues in spec
+lit [help | usage]              Show usage
+lit init                        Initialize new issue tracker
+lit new                         Create new issue
+lit list [<sort>] <spec>        Show summary list of issues in spec
+lit id [<sort>] <spec>          List ids in spec
+lit show [<sort>] <spec>        Show issues in spec
+lit set <field> <val> <spec>    Set issue field
+lit comment <id> [<text>]       Add issue comment (opens editor if no text given)
+lit edit <spec>                 Edit issues in spec
+lit close <spec>                Close issues in spec
+lit reopen <spec>               Reopen closed issues in spec
 
-sort: (sort|rsort) <field>
+sort: (sortby|rsortby) <field>  Sort (reverse if rsortby) based on field
 
 spec: all | <ids> | (with|without) <field> [<val>] | (less|greater) <field> <val>
-      If field is comment, compare contents or timestamps based on search type`
+      If field is 'comment', compare contents or timestamps based on search type`
 
 // id, closed?, priority, assigned, tags, summary
 const listFmt = "%-8.8s %-1.1s %-1.1s %-8.8s %-17.17s %s"
@@ -38,13 +38,13 @@ var (
 	args    = os.Args[1:]
 	it      = lit.New()
 	listHdr = fmt.Sprintf(listFmt, "id", "c", "p", "assigned", "tags", "summary")
+	cmd     string
 )
 
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix("lit: ")
 
-	cmd := ""
 	if len(args) > 0 {
 		cmd = args[0]
 		args = args[1:]
@@ -69,7 +69,7 @@ func main() {
 	case "edit":
 		editCmd()
 	case "close", "reopen":
-		closeCmd(cmd)
+		closeCmd()
 	default:
 		log.Fatalln(cmd + " is not a valid command")
 	}
@@ -81,20 +81,20 @@ func usageCmd() {
 
 func initCmd() {
 	err := it.Init()
-	checkErr("init", err)
+	checkErr(err)
 }
 
 func newCmd() {
-	loadIssues("new")
+	loadIssues()
 	id, err := it.NewIssue()
-	checkErr("new", err)
-	storeIssues("new")
+	checkErr(err)
+	storeIssues()
 	fmt.Println(id)
 }
 
 func listCmd() {
-	loadIssues("list")
-	doSort, field, doAscend := dispOpts("list")
+	loadIssues()
+	doSort, field, doAscend := dispOpts()
 	ids := specIds()
 	if doSort {
 		it.Sort(ids, field, doAscend)
@@ -109,8 +109,8 @@ func listCmd() {
 }
 
 func idCmd() {
-	loadIssues("id")
-	doSort, field, doAscend := dispOpts("id")
+	loadIssues()
+	doSort, field, doAscend := dispOpts()
 	ids := specIds()
 	if doSort {
 		it.Sort(ids, field, doAscend)
@@ -123,8 +123,8 @@ func idCmd() {
 }
 
 func showCmd() {
-	loadIssues("show")
-	doSort, field, doAscend := dispOpts("show")
+	loadIssues()
+	doSort, field, doAscend := dispOpts()
 	ids := specIds()
 	if doSort {
 		it.Sort(ids, field, doAscend)
@@ -140,7 +140,7 @@ func setCmd() {
 	}
 	key, val := args[0], args[1]
 	args = args[2:]
-	loadIssues("set")
+	loadIssues()
 	stamp := lit.Stamp()
 	for _, id := range specIds() {
 		issue := it.Issue(id)
@@ -155,7 +155,7 @@ func setCmd() {
 			continue
 		}
 	}
-	storeIssues("set")
+	storeIssues()
 }
 
 func editCmd() {
@@ -167,11 +167,11 @@ func editCmd() {
 		log.Fatalln("edit: you must specify a spec to edit")
 	}
 
-	loadIssues("edit")
+	loadIssues()
 
 	// create temp file
 	tempFile, err := ioutil.TempFile("", "lit-")
-	checkErr("edit", err)
+	checkErr(err)
 	filename := tempFile.Name()
 
 	// load issue content into temp file
@@ -192,24 +192,24 @@ func editCmd() {
 
 	// get original file state
 	origStat, err := os.Stat(filename)
-	checkErr("edit", err)
+	checkErr(err)
 
 	// launch editor
-	cmd := exec.Command(editor, filename)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	err = cmd.Run()
-	checkErr("edit", err)
+	ed := exec.Command(editor, filename)
+	ed.Stdin, ed.Stdout, ed.Stderr = os.Stdin, os.Stdout, os.Stderr
+	err = ed.Run()
+	checkErr(err)
 
 	// get updated file state, compare to original
 	newStat, err := os.Stat(filename)
-	checkErr("edit", err)
+	checkErr(err)
 	if newStat.ModTime() == origStat.ModTime() {
 		log.Fatalln("edit: file unchanged")
 	}
 
 	// parse issue from temp file
 	tempFile, err = os.Open(filename)
-	checkErr("edit", err)
+	checkErr(err)
 	edited := dgrl.NewParser().Parse(tempFile)
 	tempFile.Close()
 	if edited == nil {
@@ -238,14 +238,14 @@ func editCmd() {
 		log.Fatalln("edit: did not update anything")
 	}
 
-	storeIssues("edit")
+	storeIssues()
 }
 
-func closeCmd(cmd string) {
+func closeCmd() {
 	if len(args) < 1 {
 		log.Fatalf("%s: you must specify a spec\n", cmd)
 	}
-	loadIssues(cmd)
+	loadIssues()
 	stamp := lit.Stamp()
 	for _, id := range specIds() {
 		issue := it.Issue(id)
@@ -264,7 +264,7 @@ func closeCmd(cmd string) {
 			continue
 		}
 	}
-	storeIssues(cmd)
+	storeIssues()
 }
 
 func commentCmd() {
@@ -272,7 +272,7 @@ func commentCmd() {
 		log.Fatalln("comment: you must specify an issue to comment on")
 	}
 	id := args[0]
-	loadIssues("comment")
+	loadIssues()
 	issue := it.Issue(id)
 	if issue == nil {
 		log.Fatalf("comment: error finding issue %s\n", id)
@@ -286,7 +286,7 @@ func commentCmd() {
 	commentBranch := dgrl.NewBranch(lit.Stamp())
 	commentBranch.Append(dgrl.NewText(comment))
 	issue.Append(commentBranch)
-	storeIssues("comment")
+	storeIssues()
 }
 
 func editComment() string {
@@ -296,29 +296,29 @@ func editComment() string {
 	}
 	// create temp file
 	tempFile, err := ioutil.TempFile("", "lit-")
-	checkErr("comment", err)
+	checkErr(err)
 	filename := tempFile.Name()
 
 	// get original file state
 	origStat, err := os.Stat(filename)
-	checkErr("comment", err)
+	checkErr(err)
 
 	// launch editor
-	cmd := exec.Command(editor, filename)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	err = cmd.Run()
-	checkErr("comment", err)
+	ed := exec.Command(editor, filename)
+	ed.Stdin, ed.Stdout, ed.Stderr = os.Stdin, os.Stdout, os.Stderr
+	err = ed.Run()
+	checkErr(err)
 
 	// get updated file state, compare to original
 	newStat, err := os.Stat(filename)
-	checkErr("comment", err)
+	checkErr(err)
 	if newStat.ModTime() == origStat.ModTime() {
 		log.Fatalln("comment: file unchanged")
 	}
 
 	// read comment from file
 	commentData, err := ioutil.ReadFile(filename)
-	checkErr("comment", err)
+	checkErr(err)
 	return string(commentData)
 }
 
@@ -356,7 +356,7 @@ func compareIds(kv []string, isLess bool) []string {
 	return it.Compare(key, val, isLess)
 }
 
-func dispOpts(cmd string) (bool, string, bool) {
+func dispOpts() (bool, string, bool) {
 	switch {
 	case len(args) == 0:
 		return false, "", true
@@ -394,17 +394,17 @@ func specIds() []string {
 	return ids
 }
 
-func loadIssues(cmd string) {
+func loadIssues() {
 	err := it.Load()
-	checkErr(cmd, err)
+	checkErr(err)
 }
 
-func storeIssues(cmd string) {
+func storeIssues() {
 	err := it.Store()
-	checkErr(cmd, err)
+	checkErr(err)
 }
 
-func checkErr(cmd string, err error) {
+func checkErr(err error) {
 	if err != nil {
 		log.Fatalf("%s: %s\n", cmd, err)
 	}
