@@ -14,17 +14,18 @@ import (
 
 const usage = `usage:
 
-lit [help | usage]            Show usage
-lit init                      Initialize new issue tracker
-lit new                       Create new issue
-lit list <spec>               Show summary list of issues in spec
-lit id <spec>                 List ids in spec
-lit show <spec>               Show issues in spec
-lit set <field> <val> <spec>  Set issue field
-lit comment <id> [<text>]     Add issue comment (opens editor if no text given)
-lit edit <spec>               Edit issues in spec
-lit close <spec>              Close issues in spec
-lit reopen <spec>             Reopen closed issues in spec
+lit [help | usage]             Show usage
+lit init                       Initialize new issue tracker
+lit new                        Create new issue
+lit list <spec>                Show summary list of issues in spec
+lit id <spec>                  List ids in spec
+lit sort|rsort <field> <spec>  Sort (rsort for reverse) ids in spec
+lit show <spec>                Show issues in spec
+lit set <field> <val> <spec>   Set issue field
+lit comment <id> [<text>]      Add issue comment (opens editor if no text given)
+lit edit <spec>                Edit issues in spec
+lit close <spec>               Close issues in spec
+lit reopen <spec>              Reopen closed issues in spec
 
 spec: all | <ids> | (with|without) <field> [<val>] | (less|greater) <field> <val>
       If field is comment, compare contents or timestamps based on search type`
@@ -68,6 +69,8 @@ func main() {
 		editCmd()
 	case "close", "reopen":
 		closeCmd(cmd)
+	case "sort", "rsort":
+		sortCmd(cmd)
 	default:
 		log.Fatalln(cmd + " is not a valid command")
 	}
@@ -107,6 +110,18 @@ func idCmd() {
 		if it.Issue(id) != nil {
 			fmt.Println(id)
 		}
+	}
+}
+
+func sortCmd(cmd string) {
+	if len(args) < 1 {
+		log.Fatalln("sort: you must specify a field to sort by")
+	}
+	loadIssues(cmd)
+	ids := specIds(args[1:])
+	it.Sort(args[0], ids, cmd == "sort")
+	for _, id := range ids {
+		fmt.Println(id)
 	}
 }
 

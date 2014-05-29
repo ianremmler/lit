@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/user"
+	"sort"
 	"strings"
 	"time"
 
@@ -85,7 +86,7 @@ func (l *Lit) NewIssue() (string, error) {
 	issue.Append(dgrl.NewLeaf("tags", ""))
 	issue.Append(dgrl.NewLeaf("priority", "1"))
 	issue.Append(dgrl.NewLeaf("assigned", ""))
-	issue.Append(dgrl.NewLongLeaf("description", "\n"))
+	issue.Append(dgrl.NewLongLeaf("description", ""))
 	l.issues.Append(issue)
 
 	return id, nil
@@ -112,6 +113,37 @@ func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	return matches
 }
 
+type sorter struct{ ids, vals []string }
+
+func newSorter(ids []string) *sorter {
+	return &sorter{ids: ids, vals: make([]string, len(ids))}
+}
+
+func (s *sorter) Len() int { return len(s.ids) }
+
+func (s *sorter) Less(i, j int) bool { return s.vals[i] < s.vals[j] }
+
+func (s *sorter) Swap(i, j int) {
+	s.ids[i], s.ids[j] = s.ids[j], s.ids[i]
+	s.vals[i], s.vals[j] = s.vals[j], s.vals[i]
+}
+
+func (l *Lit) Sort(key string, ids []string, doAscend bool) {
+	srt := newSorter(ids)
+	for i := range ids {
+		if issue := l.Issue(ids[i]); issue != nil {
+			if val, ok := Get(issue, key); ok {
+				srt.vals[i] = val
+			}
+		}
+	}
+	if doAscend {
+		sort.Stable(srt)
+	} else {
+		sort.Stable(sort.Reverse(srt))
+	}
+}
+
 func (l *Lit) Compare(key, val string, isLess bool) []string {
 	matches := []string{}
 	if val == "" {
@@ -128,6 +160,9 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 }
 
 func Get(issue *dgrl.Branch, key string) (string, bool) {
+	if issue == nil {
+		return "", false
+	}
 	for _, k := range issue.Kids() {
 		if leaf, ok := k.(*dgrl.Leaf); ok {
 			if strings.HasPrefix(leaf.Key(), key) {
@@ -139,6 +174,9 @@ func Get(issue *dgrl.Branch, key string) (string, bool) {
 }
 
 func Set(issue *dgrl.Branch, key, val string) bool {
+	if issue == nil {
+		return false
+	}
 	for _, k := range issue.Kids() {
 		if leaf, ok := k.(*dgrl.Leaf); ok {
 			if strings.HasPrefix(leaf.Key(), key) {
@@ -151,6 +189,9 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 }
 
 func contains(issue *dgrl.Branch, key, val string) bool {
+	if issue == nil {
+		return false
+	}
 	if key == "comment" {
 		return commentContains(issue, val)
 	}
@@ -166,6 +207,9 @@ func contains(issue *dgrl.Branch, key, val string) bool {
 }
 
 func commentContains(issue *dgrl.Branch, val string) bool {
+	if issue == nil {
+		return false
+	}
 	for _, k := range issue.Kids() {
 		if comment, ok := k.(*dgrl.Branch); ok {
 			for _, kk := range comment.Kids() {
@@ -181,6 +225,9 @@ func commentContains(issue *dgrl.Branch, val string) bool {
 }
 
 func compare(issue *dgrl.Branch, key, val string, isLess bool) bool {
+	if issue == nil {
+		return false
+	}
 	if key == "comment" {
 		return commentCompare(issue, val, isLess)
 	}
@@ -195,6 +242,9 @@ func compare(issue *dgrl.Branch, key, val string, isLess bool) bool {
 }
 
 func commentCompare(issue *dgrl.Branch, time string, isLess bool) bool {
+	if issue == nil {
+		return false
+	}
 	for _, k := range issue.Kids() {
 		if comment, ok := k.(*dgrl.Branch); ok {
 			commentTime := comment.Key()
