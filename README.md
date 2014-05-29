@@ -21,5 +21,5 @@ bob or have priority greater than 1:
 
 ```
 ((lit id with assigned bob; lit id greater priority 1) | lit-or; \
- lit id without closed) | lit-and | xargs lit list
+ lit id without closed) | lit-and | lit list
 ```
