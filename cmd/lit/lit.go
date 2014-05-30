@@ -167,12 +167,12 @@ func setCmd() {
 }
 
 func editCmd() {
+	if len(args) < 1 {
+		log.Fatalln("edit: you must specify a spec to edit")
+	}
 	editor := getEditor()
 	if editor == "" {
 		log.Fatalln("edit: VISUAL or EDITOR environment variable must be set")
-	}
-	if len(args) < 1 {
-		log.Fatalln("edit: you must specify a spec to edit")
 	}
 
 	loadIssues()
@@ -184,6 +184,7 @@ func editCmd() {
 
 	// load issue content into temp file
 	ids := specIds()
+	toEdit := dgrl.NewRoot()
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue == nil {
@@ -194,8 +195,10 @@ func editCmd() {
 			log.Printf("edit: error setting update time for issue %s\n", id)
 			continue
 		}
-		fmt.Fprintln(tempFile, issue)
+		toEdit.Append(issue)
 	}
+	err = toEdit.Write(tempFile)
+	checkErr(err)
 	tempFile.Close()
 
 	// get original file state
