@@ -1,3 +1,4 @@
+// Package lit provides the core of the lightweight issue tracker.
 package lit
 
 import (
@@ -12,16 +13,23 @@ import (
 	"github.com/ianremmler/dgrl"
 )
 
+const (
+	issueFilename = "issues"
+)
+
+// Lit stores and manipulates issues
 type Lit struct {
 	issues *dgrl.Branch
 }
 
+// New constructs a new Lit.
 func New() *Lit {
 	return &Lit{issues: dgrl.NewRoot()}
 }
 
+// Init initializes the issue tracker.
 func (l *Lit) Init() error {
-	issueFile, err := os.OpenFile("issues", os.O_RDWR|os.O_CREATE, 0666)
+	issueFile, err := os.OpenFile(issueFilename, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
@@ -29,8 +37,9 @@ func (l *Lit) Init() error {
 	return nil
 }
 
+// Load parses the issue file and populates the list of issues
 func (l *Lit) Load() error {
-	issueFile, err := os.Open("issues")
+	issueFile, err := os.Open(issueFilename)
 	if err != nil {
 		return err
 	}
@@ -43,11 +52,12 @@ func (l *Lit) Load() error {
 	return nil
 }
 
+// Store writes the issue list to the file
 func (l *Lit) Store() error {
 	if l.issues == nil {
 		return errors.New("issues not initialized")
 	}
-	issueFile, err := os.Create("issues")
+	issueFile, err := os.Create(issueFilename)
 	if err != nil {
 		return err
 	}
@@ -59,6 +69,7 @@ func (l *Lit) Store() error {
 	return nil
 }
 
+// IssueIds returns a slice of all issue ids
 func (l *Lit) IssueIds() []string {
 	if l.issues == nil {
 		return []string{}
@@ -72,6 +83,7 @@ func (l *Lit) IssueIds() []string {
 	return issueIds
 }
 
+// NewIssue adds a new issue and returns its id
 func (l *Lit) NewIssue() (string, error) {
 	if l.issues == nil {
 		return "", errors.New("issues not initialized")
@@ -92,6 +104,7 @@ func (l *Lit) NewIssue() (string, error) {
 	return id, nil
 }
 
+// Issue returns an issue for the given id
 func (l *Lit) Issue(id string) *dgrl.Branch {
 	for _, k := range l.issues.Kids() {
 		if issue, ok := k.(*dgrl.Branch); ok && strings.HasPrefix(issue.Key(), id) {
@@ -101,6 +114,7 @@ func (l *Lit) Issue(id string) *dgrl.Branch {
 	return nil
 }
 
+// Match returns a list of ids for all issues whose value for key contains val.
 func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
 	for _, k := range l.issues.Kids() {
@@ -119,15 +133,19 @@ func newSorter(ids []string) *sorter {
 	return &sorter{ids: ids, vals: make([]string, len(ids))}
 }
 
+// Len returns the number of elements to sort.
 func (s *sorter) Len() int { return len(s.ids) }
 
+// Less returns whether the first element is less than the second.
 func (s *sorter) Less(i, j int) bool { return s.vals[i] < s.vals[j] }
 
+// Swap swaps two elements
 func (s *sorter) Swap(i, j int) {
 	s.ids[i], s.ids[j] = s.ids[j], s.ids[i]
 	s.vals[i], s.vals[j] = s.vals[j], s.vals[i]
 }
 
+// Sort sorts the list of ids by the value for the given key.
 func (l *Lit) Sort(ids []string, key string, doAscend bool) {
 	srt := newSorter(ids)
 	for i := range ids {
@@ -144,6 +162,8 @@ func (l *Lit) Sort(ids []string, key string, doAscend bool) {
 	}
 }
 
+// Compare returns a list of ids for all issues whose value for key is less
+// or greater, determined by isLess, than val.
 func (l *Lit) Compare(key, val string, isLess bool) []string {
 	matches := []string{}
 	if val == "" {
@@ -159,6 +179,8 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 	return matches
 }
 
+// Get returns the value for the given key, if found in the issue.
+// key may be a substring matching the beginning of the issue key.
 func Get(issue *dgrl.Branch, key string) (string, bool) {
 	if issue == nil {
 		return "", false
@@ -173,6 +195,8 @@ func Get(issue *dgrl.Branch, key string) (string, bool) {
 	return "", false
 }
 
+// Set sets the value for the given key, if found in the issue.
+// key may be a substring matching the beginning of the issue key.
 func Set(issue *dgrl.Branch, key, val string) bool {
 	if issue == nil {
 		return false
@@ -269,6 +293,8 @@ func curUser() (string, error) {
 	return user.Username, nil
 }
 
+// Stamp returns a string consisting of the current time in RFC3339 UTC format
+// and the name of the current user, separated by a space.
 func Stamp() string {
 	user, err := curUser()
 	if err != nil {

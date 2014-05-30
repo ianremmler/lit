@@ -14,25 +14,27 @@ import (
 
 const usage = `usage:
 
-lit [help | usage]              Show usage
-lit init                        Initialize new issue tracker
-lit new                         Create new issue
-lit list [<sort>] <spec>        Show summary list of issues in spec
-lit id [<sort>] <spec>          List ids in spec
-lit show [<sort>] <spec>        Show issues in spec
-lit set <field> <val> <spec>    Set issue field
-lit comment <id> [<text>]       Add issue comment (opens editor if no text given)
-lit edit <spec>                 Edit issues in spec
-lit close <spec>                Close issues in spec
-lit reopen <spec>               Reopen closed issues in spec
+lit [help | usage]          Show usage
+lit init                    Initialize new issue tracker
+lit new                     Create new issue
+lit list [<sort>] <spec>    Show summary list of issues in spec
+lit id [<sort>] <spec>      List ids in spec
+lit show [<sort>] <spec>    Show issues in spec
+lit set <key> <val> <spec>  Set value for issue key
+lit comment <id> [<text>]   Add issue comment (opens editor if no text given)
+lit edit <spec>             Edit issues in spec
+lit close <spec>            Close issues in spec
+lit reopen <spec>           Reopen closed issues in spec
 
-sort: (sortby|rsortby) <field>  Sort (reverse if rsortby) based on field
+sort: (sortby|rsortby) <key>  Sort (reverse if rsortby) based on key
 
-spec: all | <ids> | (with|without) <field> [<val>] | (less|greater) <field> <val>
-      If field is 'comment', compare contents or timestamps based on search type`
+spec: all | <ids> | (with|without) <key> [<val>] | (less|greater) <key> <val>
+      If key is 'comment', compare contents or timestamps based on search type`
 
-// id, closed?, priority, assigned, tags, summary
-const listFmt = "%-8.8s %-1.1s %-1.1s %-8.8s %-17.17s %s"
+const (
+	// id, closed?, priority, assigned, tags, summary
+	listFmt = "%-8.8s %-1.1s %-1.1s %-8.8s %-17.17s %s"
+)
 
 var (
 	args    = os.Args[1:]
@@ -102,10 +104,10 @@ func newCmd() {
 
 func listCmd() {
 	loadIssues()
-	doSort, field, doAscend := dispOpts()
+	doSort, key, doAscend := dispOpts()
 	ids := specIds()
 	if doSort {
-		it.Sort(ids, field, doAscend)
+		it.Sort(ids, key, doAscend)
 	}
 	fmt.Println(listHdr)
 	for _, id := range ids {
@@ -118,10 +120,10 @@ func listCmd() {
 
 func idCmd() {
 	loadIssues()
-	doSort, field, doAscend := dispOpts()
+	doSort, key, doAscend := dispOpts()
 	ids := specIds()
 	if doSort {
-		it.Sort(ids, field, doAscend)
+		it.Sort(ids, key, doAscend)
 	}
 	for _, id := range ids {
 		if it.Issue(id) != nil {
@@ -132,10 +134,10 @@ func idCmd() {
 
 func showCmd() {
 	loadIssues()
-	doSort, field, doAscend := dispOpts()
+	doSort, key, doAscend := dispOpts()
 	ids := specIds()
 	if doSort {
-		it.Sort(ids, field, doAscend)
+		it.Sort(ids, key, doAscend)
 	}
 	for _, id := range ids {
 		fmt.Println(it.Issue(id))
@@ -144,7 +146,7 @@ func showCmd() {
 
 func setCmd() {
 	if len(args) < 3 {
-		log.Fatalln("set: you must specify a field, value, and spec")
+		log.Fatalln("set: you must specify a key, value, and spec")
 	}
 	key, val := args[0], args[1]
 	args = args[2:]
@@ -377,13 +379,13 @@ func dispOpts() (bool, string, bool) {
 		return false, "", true
 	case args[0] == "sortby" || args[0] == "rsortby":
 		if len(args) < 2 {
-			log.Fatalf("%s: sort requested, but no field given to sort by\n", cmd)
+			log.Fatalf("%s: sort requested, but no key given to sort by\n", cmd)
 		}
 		doSort := true
 		doAscend := (args[0] == "sortby")
-		field := args[1]
+		key := args[1]
 		args = args[2:]
-		return doSort, field, doAscend
+		return doSort, key, doAscend
 	}
 	return false, "", true
 }
