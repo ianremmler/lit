@@ -291,9 +291,13 @@ func commentCmd() {
 	} else {
 		comment = editComment()
 	}
-	commentBranch := dgrl.NewBranch(lit.Stamp())
+	stamp := lit.Stamp()
+	commentBranch := dgrl.NewBranch(stamp)
 	commentBranch.Append(dgrl.NewText(comment))
 	issue.Append(commentBranch)
+	if !lit.Set(issue, "updated", stamp) {
+		log.Printf("comment: error setting update time for issue %s\n", id)
+	}
 	storeIssues()
 }
 
