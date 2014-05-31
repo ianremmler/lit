@@ -213,9 +213,6 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 }
 
 func contains(issue *dgrl.Branch, key, val string) bool {
-	if issue == nil {
-		return false
-	}
 	if key == "comment" {
 		return commentContains(issue, val)
 	}
@@ -249,9 +246,6 @@ func commentContains(issue *dgrl.Branch, val string) bool {
 }
 
 func compare(issue *dgrl.Branch, key, val string, isLess bool) bool {
-	if issue == nil {
-		return false
-	}
 	if key == "comment" {
 		return commentCompare(issue, val, isLess)
 	}
@@ -301,4 +295,32 @@ func Stamp() string {
 		user = "?"
 	}
 	return curTime() + " " + user
+}
+
+func tagStrToSet(tagStr string) map[string]struct{} {
+	set := map[string]struct{}{}
+	for _, tag := range strings.Fields(tagStr) {
+		set[tag] = struct{}{}
+	}
+	return set
+}
+
+func setToTagStr(set map[string]struct{}) string {
+	tags := make([]string, len(set))
+	for tag := range set {
+		tags = append(tags, tag)
+	}
+	return strings.TrimSpace(strings.Join(tags, " "))
+}
+
+// ModifyTag adds or removes a tag for a given issue
+func ModifyTag(issue *dgrl.Branch, tag string, doAdd bool) bool {
+	tags, _ := Get(issue, "tag")
+	tagSet := tagStrToSet(tags)
+	if doAdd {
+		tagSet[tag] = struct{}{}
+	} else {
+		delete(tagSet, tag)
+	}
+	return Set(issue, "tag", setToTagStr(tagSet))
 }

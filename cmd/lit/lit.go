@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/ianremmler/dgrl"
@@ -14,22 +15,24 @@ import (
 
 const usage = `usage:
 
-lit [help | usage]          Show usage
-lit init                    Initialize new issue tracker
-lit new                     Create new issue
-lit list [<sort>] <spec>    Show summary list of issues in spec
-lit id [<sort>] <spec>      List ids in spec
-lit show [<sort>] <spec>    Show issues in spec
-lit set <key> <val> <spec>  Set value for issue key
-lit comment <id> [<text>]   Add issue comment (opens editor if no text given)
-lit edit <spec>             Edit issues in spec
-lit close <spec>            Close issues in spec
-lit reopen <spec>           Reopen closed issues in spec
+lit [help | usage]              Show usage
+lit init                        Initialize new issue tracker
+lit new                         Create new issue
+lit list [<sort>] <spec>        Show summary list of specified issues
+lit id [<sort>] <spec>          List ids of specified issues
+lit show [<sort>] <spec>        Show specified issues
+lit set <key> <val> <spec>      Set value for key in specified issues
+lit tag (add|del) <tag> <spec>  Add or delete tag in specified issues
+lit comment <id> [<text>]       Add issue comment (open editor if no text given)
+lit edit <spec>                 Edit specified issues
+lit close <spec>                Close specified issues
+lit reopen <spec>               Reopen specified issues
 
 sort: (sortby|rsortby) <key>  Sort (reverse if rsortby) based on key
 
 spec: all | <ids> | (with|without) <key> [<val>] | (less|greater) <key> <val>
-      If key is 'comment', compare contents or timestamps based on search type`
+	Specifies which issues to operate on
+	Use 'comment' key to filter by comment contents and times`
 
 const (
 	// id, closed?, priority, assigned, tags, summary
@@ -74,6 +77,8 @@ func main() {
 		showCmd()
 	case "set":
 		setCmd()
+	case "tag":
+		tagCmd()
 	case "comment":
 		commentCmd()
 	case "edit":
@@ -95,11 +100,19 @@ func initCmd() {
 }
 
 func newCmd() {
+	numIssues := 1
+	if len(args) > 0 {
+		num, err := strconv.ParseUint(args[0], 10, 16)
+		checkErr(err)
+		numIssues = int(num)
+	}
 	loadIssues()
-	id, err := it.NewIssue()
-	checkErr(err)
+	for i := 0; i < numIssues; i++ {
+		id, err := it.NewIssue()
+		checkErr(err)
+		fmt.Println(id)
+	}
 	storeIssues()
-	fmt.Println(id)
 }
 
 func listCmd() {
@@ -162,6 +175,35 @@ func setCmd() {
 		ok = ok && lit.Set(issue, "updated", stamp)
 		if !ok {
 			log.Printf("set: error updating fields in issue %s\n", id)
+			continue
+		}
+	}
+	storeIssues()
+}
+
+func tagCmd() {
+	if len(args) < 3 {
+		log.Fatalln("tag: you must specify an operation, tag, and spec")
+	}
+	op, tag := args[0], args[1]
+	if op != "add" && op != "del" {
+		log.Fatalf("tag: is not a valid operation\n")
+	}
+	doAdd := (op == "add")
+
+	args = args[2:]
+	loadIssues()
+	stamp := lit.Stamp()
+	for _, id := range specIds() {
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Printf("tag: error finding issue %s\n", id)
+			continue
+		}
+		ok := lit.ModifyTag(issue, tag, doAdd)
+		ok = ok && lit.Set(issue, "updated", stamp)
+		if !ok {
+			log.Printf("tag: error updating fields in issue %s\n", id)
 			continue
 		}
 	}
