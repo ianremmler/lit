@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/user"
 	"sort"
 	"strings"
 	"time"
@@ -18,21 +17,9 @@ const (
 	issueFilename = "issues"
 )
 
-var (
-	username = "?"
-)
-
-func init() {
-	if env := os.Getenv("LIT_USER"); env != "" {
-		username = env
-	} else if user, err := user.Current(); err == nil {
-		username = user.Username
-	}
-}
-
 // Stamp returns a string consisting of the current time in RFC3339 UTC format
 // and the username, separated by a space.
-func Stamp() string {
+func Stamp(username string) string {
 	return fmt.Sprintf("%s %s", time.Now().UTC().Format(time.RFC3339), username)
 }
 
@@ -136,13 +123,13 @@ func (l *Lit) IssueIds() []string {
 }
 
 // NewIssue adds a new issue and returns its id
-func (l *Lit) NewIssue() (string, error) {
+func (l *Lit) NewIssue(username string) (string, error) {
 	if l.issues == nil {
 		return "", errors.New("issues not initialized")
 	}
 	id := uuid.New()
 	issue := dgrl.NewBranch(id)
-	stamp := Stamp()
+	stamp := Stamp(username)
 	issue.Append(dgrl.NewLeaf("created", stamp))
 	issue.Append(dgrl.NewLeaf("updated", stamp))
 	issue.Append(dgrl.NewLeaf("closed", ""))

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"strconv"
 	"strings"
 
@@ -40,15 +41,22 @@ const (
 )
 
 var (
-	args    = os.Args[1:]
-	it      = lit.New()
-	listHdr = fmt.Sprintf(listFmt, "id", "c", "p", "assigned", "tags", "summary")
-	cmd     string
+	args     = os.Args[1:]
+	it       = lit.New()
+	listHdr  = fmt.Sprintf(listFmt, "id", "c", "p", "assigned", "tags", "summary")
+	username = "?"
+	cmd      string
 )
 
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix("lit: ")
+
+	if userEnv := os.Getenv("LIT_USER"); userEnv != "" {
+		username = userEnv
+	} else if user, err := user.Current(); err == nil {
+		username = user.Username
+	}
 
 	// append args piped in from stdin
 	if stat, err := os.Stdin.Stat(); err == nil && stat.Mode()&os.ModeNamedPipe != 0 {
@@ -108,7 +116,7 @@ func newCmd() {
 	}
 	loadIssues()
 	for i := 0; i < numIssues; i++ {
-		id, err := it.NewIssue()
+		id, err := it.NewIssue(username)
 		checkErr(err)
 		fmt.Println(id)
 	}
@@ -164,7 +172,7 @@ func setCmd() {
 	key, val := args[0], args[1]
 	args = args[2:]
 	loadIssues()
-	stamp := lit.Stamp()
+	stamp := lit.Stamp(username)
 	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
@@ -193,7 +201,7 @@ func tagCmd() {
 
 	args = args[2:]
 	loadIssues()
-	stamp := lit.Stamp()
+	stamp := lit.Stamp(username)
 	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
@@ -269,7 +277,7 @@ func editCmd() {
 
 	// update issues if we find a match
 	didUpdate := false
-	stamp := lit.Stamp()
+	stamp := lit.Stamp(username)
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue == nil {
@@ -302,7 +310,7 @@ func closeCmd() {
 		log.Fatalf("%s: you must specify a spec\n", cmd)
 	}
 	loadIssues()
-	stamp := lit.Stamp()
+	stamp := lit.Stamp(username)
 	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
@@ -339,7 +347,7 @@ func commentCmd() {
 	} else {
 		comment = editComment()
 	}
-	stamp := lit.Stamp()
+	stamp := lit.Stamp(username)
 	commentBranch := dgrl.NewBranch(stamp)
 	commentBranch.Append(dgrl.NewText(comment))
 	issue.Append(commentBranch)
