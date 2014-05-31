@@ -3,6 +3,7 @@ package lit
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/user"
 	"sort"
@@ -16,6 +17,57 @@ import (
 const (
 	issueFilename = "issues"
 )
+
+var (
+	username = "?"
+)
+
+func init() {
+	if env := os.Getenv("LIT_USER"); env != "" {
+		username = env
+	} else if user, err := user.Current(); err == nil {
+		username = user.Username
+	}
+}
+
+// Stamp returns a string consisting of the current time in RFC3339 UTC format
+// and the username, separated by a space.
+func Stamp() string {
+	return fmt.Sprintf("%s %s", time.Now().UTC().Format(time.RFC3339), username)
+}
+
+// Get returns the value for the given key, if found in the issue.
+// key may be a substring matching the beginning of the issue key.
+func Get(issue *dgrl.Branch, key string) (string, bool) {
+	if issue == nil {
+		return "", false
+	}
+	for _, k := range issue.Kids() {
+		if leaf, ok := k.(*dgrl.Leaf); ok {
+			if strings.HasPrefix(leaf.Key(), key) {
+				return leaf.Value(), true
+			}
+		}
+	}
+	return "", false
+}
+
+// Set sets the value for the given key, if found in the issue.
+// key may be a substring matching the beginning of the issue key.
+func Set(issue *dgrl.Branch, key, val string) bool {
+	if issue == nil {
+		return false
+	}
+	for _, k := range issue.Kids() {
+		if leaf, ok := k.(*dgrl.Leaf); ok {
+			if strings.HasPrefix(leaf.Key(), key) {
+				leaf.SetValue(val)
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // Lit stores and manipulates issues
 type Lit struct {
@@ -96,7 +148,7 @@ func (l *Lit) NewIssue() (string, error) {
 	issue.Append(dgrl.NewLeaf("closed", ""))
 	issue.Append(dgrl.NewLeaf("summary", ""))
 	issue.Append(dgrl.NewLeaf("tags", ""))
-	issue.Append(dgrl.NewLeaf("priority", "1"))
+	issue.Append(dgrl.NewLeaf("priority", ""))
 	issue.Append(dgrl.NewLeaf("assigned", ""))
 	issue.Append(dgrl.NewLongLeaf("description", ""))
 	l.issues.Append(issue)
@@ -179,39 +231,6 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 	return matches
 }
 
-// Get returns the value for the given key, if found in the issue.
-// key may be a substring matching the beginning of the issue key.
-func Get(issue *dgrl.Branch, key string) (string, bool) {
-	if issue == nil {
-		return "", false
-	}
-	for _, k := range issue.Kids() {
-		if leaf, ok := k.(*dgrl.Leaf); ok {
-			if strings.HasPrefix(leaf.Key(), key) {
-				return leaf.Value(), true
-			}
-		}
-	}
-	return "", false
-}
-
-// Set sets the value for the given key, if found in the issue.
-// key may be a substring matching the beginning of the issue key.
-func Set(issue *dgrl.Branch, key, val string) bool {
-	if issue == nil {
-		return false
-	}
-	for _, k := range issue.Kids() {
-		if leaf, ok := k.(*dgrl.Leaf); ok {
-			if strings.HasPrefix(leaf.Key(), key) {
-				leaf.SetValue(val)
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func contains(issue *dgrl.Branch, key, val string) bool {
 	if key == "comment" {
 		return commentContains(issue, val)
@@ -275,26 +294,16 @@ func commentCompare(issue *dgrl.Branch, time string, isLess bool) bool {
 	return !isLess
 }
 
-func curTime() string {
-	return time.Now().UTC().Format(time.RFC3339)
-}
-
-func curUser() (string, error) {
-	user, err := user.Current()
-	if err != nil {
-		return "", err
+// ModifyTag adds or removes a tag for a given issue
+func ModifyTag(issue *dgrl.Branch, tag string, doAdd bool) bool {
+	tags, _ := Get(issue, "tag")
+	tagSet := tagStrToSet(tags)
+	if doAdd {
+		tagSet[tag] = struct{}{}
+	} else {
+		delete(tagSet, tag)
 	}
-	return user.Username, nil
-}
-
-// Stamp returns a string consisting of the current time in RFC3339 UTC format
-// and the name of the current user, separated by a space.
-func Stamp() string {
-	user, err := curUser()
-	if err != nil {
-		user = "?"
-	}
-	return curTime() + " " + user
+	return Set(issue, "tag", setToTagStr(tagSet))
 }
 
 func tagStrToSet(tagStr string) map[string]struct{} {
@@ -311,16 +320,4 @@ func setToTagStr(set map[string]struct{}) string {
 		tags = append(tags, tag)
 	}
 	return strings.TrimSpace(strings.Join(tags, " "))
-}
-
-// ModifyTag adds or removes a tag for a given issue
-func ModifyTag(issue *dgrl.Branch, tag string, doAdd bool) bool {
-	tags, _ := Get(issue, "tag")
-	tagSet := tagStrToSet(tags)
-	if doAdd {
-		tagSet[tag] = struct{}{}
-	} else {
-		delete(tagSet, tag)
-	}
-	return Set(issue, "tag", setToTagStr(tagSet))
 }
