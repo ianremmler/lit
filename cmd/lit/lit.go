@@ -235,10 +235,6 @@ func editCmd() {
 			log.Printf("edit: error finding issue %s\n", id)
 			continue
 		}
-		if !lit.Set(issue, "updated", lit.Stamp()) {
-			log.Printf("edit: error setting update time for issue %s\n", id)
-			continue
-		}
 		toEdit.Append(issue)
 	}
 	err = toEdit.Write(tempFile)
@@ -273,6 +269,7 @@ func editCmd() {
 
 	// update issues if we find a match
 	didUpdate := false
+	stamp := lit.Stamp()
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue == nil {
@@ -283,6 +280,10 @@ func editCmd() {
 			if node.Type() == dgrl.BranchType && strings.HasPrefix(node.Key(), id) {
 				if editedIssue, ok := node.(*dgrl.Branch); ok {
 					*issue = *editedIssue
+					if !lit.Set(issue, "updated", stamp) {
+						log.Printf("edit: error setting update time for issue %s\n", id)
+						continue
+					}
 					didUpdate = true
 					break
 				}
