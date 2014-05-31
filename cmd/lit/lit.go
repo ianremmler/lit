@@ -17,7 +17,7 @@ const usage = `usage:
 
 lit [help | usage]              Show usage
 lit init                        Initialize new issue tracker
-lit new                         Create new issue
+lit new [<num>]                 Create num new issues (default is 1)
 lit list [<sort>] <spec>        Show summary list of specified issues
 lit id [<sort>] <spec>          List ids of specified issues
 lit show [<sort>] <spec>        Show specified issues
