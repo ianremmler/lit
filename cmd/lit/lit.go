@@ -54,8 +54,12 @@ func main() {
 
 	if userEnv := os.Getenv("LIT_USER"); userEnv != "" {
 		username = userEnv
-	} else if user, err := user.Current(); err == nil {
-		username = user.Username
+	} else {
+		if user, err := user.Current(); err == nil {
+			if host, err := os.Hostname(); err == nil {
+				username = fmt.Sprintf("%s@%s", user.Username, host)
+			}
+		}
 	}
 
 	// append args piped in from stdin
