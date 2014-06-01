@@ -239,6 +239,9 @@ func commentContains(issue *dgrl.Branch, val string) bool {
 	}
 	for _, k := range issue.Kids() {
 		if comment, ok := k.(*dgrl.Branch); ok {
+			if strings.Contains(comment.Key(), val) {
+				return true
+			}
 			for _, kk := range comment.Kids() {
 				if leaf, ok := kk.(*dgrl.Leaf); ok {
 					if strings.Contains(leaf.Value(), val) {
