@@ -93,9 +93,6 @@ func (l *Lit) Load() error {
 
 // Store writes the issue list to the file
 func (l *Lit) Store() error {
-	if l.issues == nil {
-		return errors.New("issues not initialized")
-	}
 	issueFile, err := os.Create(issueFilename)
 	if err != nil {
 		return err
@@ -110,9 +107,6 @@ func (l *Lit) Store() error {
 
 // IssueIds returns a slice of all issue ids
 func (l *Lit) IssueIds() []string {
-	if l.issues == nil {
-		return []string{}
-	}
 	issueIds := []string{}
 	for _, k := range l.issues.Kids() {
 		if issue, ok := k.(*dgrl.Branch); ok {
@@ -124,9 +118,6 @@ func (l *Lit) IssueIds() []string {
 
 // NewIssue adds a new issue and returns its id
 func (l *Lit) NewIssue(username string) (string, error) {
-	if l.issues == nil {
-		return "", errors.New("issues not initialized")
-	}
 	id := uuid.New()
 	issue := dgrl.NewBranch(id)
 	stamp := Stamp(username)

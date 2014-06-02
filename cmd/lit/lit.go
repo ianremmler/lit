@@ -273,9 +273,9 @@ func editCmd() {
 	// parse issue from temp file
 	tempFile, err = os.Open(filename)
 	checkErr(err)
-	edited := dgrl.NewParser().Parse(tempFile)
+	edIssues := dgrl.NewParser().Parse(tempFile)
 	tempFile.Close()
-	if edited == nil {
+	if edIssues == nil {
 		log.Fatalln("edit: error parsing file")
 	}
 
@@ -288,17 +288,15 @@ func editCmd() {
 			// already printed error, so don't repeat here
 			continue
 		}
-		for _, node := range edited.Kids() {
-			if node.Type() == dgrl.BranchType && strings.HasPrefix(node.Key(), id) {
-				if editedIssue, ok := node.(*dgrl.Branch); ok {
-					*issue = *editedIssue
-					if !lit.Set(issue, "updated", stamp) {
-						log.Printf("edit: error setting update time for issue %s\n", id)
-						continue
-					}
-					didUpdate = true
-					break
+		for _, node := range edIssues.Kids() {
+			if ed, ok := node.(*dgrl.Branch); ok && strings.HasPrefix(ed.Key(), id) {
+				*issue = *ed
+				if !lit.Set(issue, "updated", stamp) {
+					log.Printf("edit: error setting update time for issue %s\n", id)
+					continue
 				}
+				didUpdate = true
+				break
 			}
 		}
 	}
