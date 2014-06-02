@@ -173,8 +173,8 @@ func showCmd() {
 }
 
 func setCmd() {
-	if len(args) < 3 {
-		log.Fatalln("set: you must specify a key, value, and spec")
+	if len(args) < 2 {
+		log.Fatalln("set: you must specify a key and value")
 	}
 	key, val := args[0], args[1]
 	args = args[2:]
@@ -197,8 +197,8 @@ func setCmd() {
 }
 
 func tagCmd() {
-	if len(args) < 3 {
-		log.Fatalln("tag: you must specify an operation, tag, and spec")
+	if len(args) < 2 {
+		log.Fatalln("tag: you must specify an operation and tag")
 	}
 	op, tag := args[0], args[1]
 	if op != "add" && op != "del" {
@@ -334,7 +334,7 @@ func closeCmd() {
 
 func commentCmd() {
 	if len(args) < 1 {
-		log.Fatalln("comment: you must specify an issue to comment on")
+		log.Fatalln("comment: you must specify an issue")
 	}
 	id := args[0]
 	loadIssues()
