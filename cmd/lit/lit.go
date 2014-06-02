@@ -18,14 +18,14 @@ const usage = `usage:
 
 lit [help | usage]              Show usage
 lit init                        Initialize new issue tracker
-lit new [<num>]                 Create num new issues (default is 1)
-lit list [<sort>] <spec>        Show summary list of specified issues
-lit id [<sort>] <spec>          List ids of specified issues
-lit show [<sort>] <spec>        Show specified issues
+lit new [<num>]                 Create num new issues (default: 1)
+lit list [<sort>] <spec>        Show list of specified issues (default: open)
+lit id [<sort>] <spec>          List ids of specified issues (default: open)
+lit show [<sort>] <spec>        Show specified issues (default: open)
 lit set <key> <val> <spec>      Set value for key in specified issues
 lit tag (add|del) <tag> <spec>  Add or delete tag in specified issues
 lit comment <id> [<text>]       Add issue comment (open editor if no text given)
-lit edit <spec>                 Edit specified issues
+lit edit <spec>                 Edit specified issues (default: open)
 lit close <spec>                Close specified issues
 lit reopen <spec>               Reopen specified issues
 
@@ -33,6 +33,7 @@ sort: (sortby|rsortby) <key>  Sort (reverse if rsortby) based on key
 
 spec: all | <ids> | (with|without) <key> [<val>] | (less|greater) <key> <val>
 	Specifies which issues to operate on
+	Default open spec does not apply if input is piped
 	Use 'comment' key to filter by comment contents and times`
 
 const (
@@ -41,11 +42,12 @@ const (
 )
 
 var (
-	args     = os.Args[1:]
-	it       = lit.New()
-	listHdr  = fmt.Sprintf(listFmt, "id", "c", "p", "assigned", "tags", "summary")
-	username = "?"
-	cmd      string
+	args        = os.Args[1:]
+	it          = lit.New()
+	listHdr     = fmt.Sprintf(listFmt, "id", "c", "p", "assigned", "tags", "summary")
+	username    = "?"
+	isStdinPipe = false
+	cmd         string
 )
 
 func main() {
@@ -64,6 +66,7 @@ func main() {
 
 	// append args piped in from stdin
 	if stat, err := os.Stdin.Stat(); err == nil && stat.Mode()&os.ModeNamedPipe != 0 {
+		isStdinPipe = true
 		if stdin, err := ioutil.ReadAll(os.Stdin); err == nil {
 			stdinArgs := strings.Fields(string(stdin))
 			args = append(args, stdinArgs...)
@@ -130,7 +133,7 @@ func newCmd() {
 func listCmd() {
 	loadIssues()
 	doSort, key, doAscend := dispOpts()
-	ids := specIds()
+	ids := specIds(!isStdinPipe)
 	if doSort {
 		it.Sort(ids, key, doAscend)
 	}
@@ -146,7 +149,7 @@ func listCmd() {
 func idCmd() {
 	loadIssues()
 	doSort, key, doAscend := dispOpts()
-	ids := specIds()
+	ids := specIds(!isStdinPipe)
 	if doSort {
 		it.Sort(ids, key, doAscend)
 	}
@@ -160,7 +163,7 @@ func idCmd() {
 func showCmd() {
 	loadIssues()
 	doSort, key, doAscend := dispOpts()
-	ids := specIds()
+	ids := specIds(!isStdinPipe)
 	if doSort {
 		it.Sort(ids, key, doAscend)
 	}
@@ -177,7 +180,7 @@ func setCmd() {
 	args = args[2:]
 	loadIssues()
 	stamp := lit.Stamp(username)
-	for _, id := range specIds() {
+	for _, id := range specIds(false) {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("set: error finding issue %s\n", id)
@@ -206,7 +209,7 @@ func tagCmd() {
 	args = args[2:]
 	loadIssues()
 	stamp := lit.Stamp(username)
-	for _, id := range specIds() {
+	for _, id := range specIds(false) {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("tag: error finding issue %s\n", id)
@@ -223,9 +226,6 @@ func tagCmd() {
 }
 
 func editCmd() {
-	if len(args) < 1 {
-		log.Fatalln("edit: you must specify a spec to edit")
-	}
 	editor := getEditor()
 	if editor == "" {
 		log.Fatalln("edit: VISUAL or EDITOR environment variable must be set")
@@ -239,7 +239,7 @@ func editCmd() {
 	filename := tempFile.Name()
 
 	// load issue content into temp file
-	ids := specIds()
+	ids := specIds(!isStdinPipe)
 	toEdit := dgrl.NewRoot()
 	for _, id := range ids {
 		issue := it.Issue(id)
@@ -310,12 +310,9 @@ func editCmd() {
 }
 
 func closeCmd() {
-	if len(args) < 1 {
-		log.Fatalf("%s: you must specify a spec\n", cmd)
-	}
 	loadIssues()
 	stamp := lit.Stamp(username)
-	for _, id := range specIds() {
+	for _, id := range specIds(false) {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("%s: error finding issue %s\n", cmd, id)
@@ -445,11 +442,13 @@ func dispOpts() (bool, string, bool) {
 	return false, "", true
 }
 
-func specIds() []string {
+func specIds(isDefaultOpen bool) []string {
 	ids := []string{}
 	switch {
 	case len(args) == 0:
-		return ids
+		if isDefaultOpen {
+			ids = matchIds([]string{"closed", ""}, false)
+		}
 	case args[0] == "with":
 		ids = matchIds(args[1:], true)
 	case args[0] == "without":
