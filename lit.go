@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -68,7 +69,7 @@ func New() *Lit {
 
 // Init initializes the issue tracker.
 func (l *Lit) Init() error {
-	issueFile, err := os.OpenFile(issueFilename, os.O_RDWR|os.O_CREATE, 0666)
+	issueFile, err := openFile(issueFilename, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,7 @@ func (l *Lit) Init() error {
 
 // Load parses the issue file and populates the list of issues
 func (l *Lit) Load() error {
-	issueFile, err := os.Open(issueFilename)
+	issueFile, err := openFile(issueFilename, os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
@@ -93,7 +94,7 @@ func (l *Lit) Load() error {
 
 // Store writes the issue list to the file
 func (l *Lit) Store() error {
-	issueFile, err := os.Create(issueFilename)
+	issueFile, err := openFile(issueFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
@@ -301,4 +302,21 @@ func setToTagStr(set map[string]struct{}) string {
 		tags = append(tags, tag)
 	}
 	return strings.TrimSpace(strings.Join(tags, " "))
+}
+
+func openFile(filename string, flag int, perm os.FileMode) (file *os.File, err error) {
+	if path.IsAbs(filename) {
+		return os.OpenFile(filename, flag, perm)
+	}
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	for p, pp := path.Join(pwd, filename), ""; p != pp; {
+		if file, err := os.OpenFile(p, flag, perm); err == nil {
+			return file, nil
+		}
+		pp, p = p, path.Join(path.Dir(path.Dir(p)), path.Base(p))
+	}
+	return nil, errors.New(fmt.Sprintf("file '%s' not found", filename))
 }
