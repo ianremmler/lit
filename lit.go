@@ -117,8 +117,8 @@ func (l *Lit) IssueIds() []string {
 	return issueIds
 }
 
-// NewIssue adds a new issue and returns its id
-func (l *Lit) NewIssue(username string) (string, error) {
+// NewIssue adds and returns a pointer to a new issue
+func (l *Lit) NewIssue(username string) *dgrl.Branch {
 	id := uuid.New()
 	issue := dgrl.NewBranch(id)
 	stamp := Stamp(username)
@@ -131,8 +131,7 @@ func (l *Lit) NewIssue(username string) (string, error) {
 	issue.Append(dgrl.NewLeaf("assigned", ""))
 	issue.Append(dgrl.NewLongLeaf("description", ""))
 	l.issues.Append(issue)
-
-	return id, nil
+	return issue
 }
 
 // Issue returns an issue for the given id

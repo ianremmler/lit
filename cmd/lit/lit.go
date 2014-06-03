@@ -123,9 +123,8 @@ func newCmd() {
 	}
 	loadIssues()
 	for i := 0; i < numIssues; i++ {
-		id, err := it.NewIssue(username)
-		checkErr(err)
-		fmt.Println(id)
+		issue := it.NewIssue(username)
+		fmt.Println(issue.Key())
 	}
 	storeIssues()
 }
@@ -141,7 +140,7 @@ func listCmd() {
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue != nil {
-			fmt.Println(listInfo(id, issue))
+			fmt.Println(listInfo(issue))
 		}
 	}
 }
@@ -154,8 +153,8 @@ func idCmd() {
 		it.Sort(ids, key, doAscend)
 	}
 	for _, id := range ids {
-		if it.Issue(id) != nil {
-			fmt.Println(id)
+		if issue := it.Issue(id); issue != nil {
+			fmt.Println(issue.Key())
 		}
 	}
 }
@@ -389,7 +388,7 @@ func editComment() string {
 	return string(commentData)
 }
 
-func listInfo(id string, issue *dgrl.Branch) string {
+func listInfo(issue *dgrl.Branch) string {
 	status := " "
 	closed, _ := lit.Get(issue, "closed")
 	if len(closed) > 0 {
@@ -399,7 +398,7 @@ func listInfo(id string, issue *dgrl.Branch) string {
 	priority, _ := lit.Get(issue, "priority")
 	assigned, _ := lit.Get(issue, "assigned")
 	summary, _ := lit.Get(issue, "summary")
-	return fmt.Sprintf(listFmt, id, status, priority, assigned, tags, summary)
+	return fmt.Sprintf(listFmt, issue.Key(), status, priority, assigned, tags, summary)
 }
 
 func keyval(kv []string) (string, string) {
