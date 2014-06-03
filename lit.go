@@ -69,7 +69,7 @@ func New() *Lit {
 
 // Init initializes the issue tracker.
 func (l *Lit) Init() error {
-	issueFile, err := openFile(issueFilename, os.O_RDWR|os.O_CREATE, 0666)
+	issueFile, err := os.OpenFile(issueFilename, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func setToTagStr(set map[string]struct{}) string {
 	return strings.TrimSpace(strings.Join(tags, " "))
 }
 
-func openFile(filename string, flag int, perm os.FileMode) (file *os.File, err error) {
+func openFile(filename string, flag int, perm os.FileMode) (*os.File, error) {
 	if path.IsAbs(filename) {
 		return os.OpenFile(filename, flag, perm)
 	}
@@ -313,8 +313,8 @@ func openFile(filename string, flag int, perm os.FileMode) (file *os.File, err e
 		return nil, err
 	}
 	for p, pp := path.Join(pwd, filename), ""; p != pp; {
-		if file, err := os.OpenFile(p, flag, perm); err == nil {
-			return file, nil
+		if stat, err := os.Stat(p); err == nil && stat.Mode().IsRegular() {
+			return os.OpenFile(p, flag, perm)
 		}
 		pp, p = p, path.Join(path.Dir(path.Dir(p)), path.Base(p))
 	}
