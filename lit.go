@@ -79,6 +79,19 @@ func (l *Lit) Init() error {
 	return nil
 }
 
+func (l *Lit) indexIssues() {
+	l.issueIds = make([]string, l.issues.NumKids())
+	l.issueMap = make(map[string]*dgrl.Branch, l.issues.NumKids())
+	for i, k := range l.issues.Kids() {
+		if issue, ok := k.(*dgrl.Branch); ok {
+			id := issue.Key()
+			l.issueIds[i] = id
+			l.issueMap[id] = issue
+		}
+	}
+	sort.Sort(sort.StringSlice(l.issueIds))
+}
+
 // Load parses the issue file and populates the list of issues
 func (l *Lit) Load() error {
 	issueFile, err := openFile(issueFilename, os.O_RDONLY, 0)
@@ -91,7 +104,7 @@ func (l *Lit) Load() error {
 		return errors.New("error parsing issue file")
 	}
 	l.issues = issues
-	l.IndexIssues()
+	l.indexIssues()
 	return nil
 }
 
@@ -138,21 +151,8 @@ func (l *Lit) NewIssues(username string, num int) []*dgrl.Branch {
 		l.issues.Append(issue)
 		issues[i] = issue
 	}
-	l.IndexIssues()
+	l.indexIssues()
 	return issues
-}
-
-func (l *Lit) IndexIssues() {
-	l.issueIds = make([]string, l.issues.NumKids())
-	l.issueMap = make(map[string]*dgrl.Branch, l.issues.NumKids())
-	for i, k := range l.issues.Kids() {
-		if issue, ok := k.(*dgrl.Branch); ok {
-			id := issue.Key()
-			l.issueIds[i] = id
-			l.issueMap[id] = issue
-		}
-	}
-	sort.Sort(sort.StringSlice(l.issueIds))
 }
 
 // Issue returns an issue for the given id
