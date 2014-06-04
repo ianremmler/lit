@@ -59,7 +59,9 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 
 // Lit stores and manipulates issues
 type Lit struct {
-	issues *dgrl.Branch
+	issues   *dgrl.Branch
+	issueIds []string
+	issueMap map[string]*dgrl.Branch
 }
 
 // New constructs a new Lit.
@@ -89,6 +91,7 @@ func (l *Lit) Load() error {
 		return errors.New("error parsing issue file")
 	}
 	l.issues = issues
+	l.IndexIssues()
 	return nil
 }
 
@@ -117,29 +120,46 @@ func (l *Lit) IssueIds() []string {
 	return issueIds
 }
 
-// NewIssue adds and returns a pointer to a new issue
-func (l *Lit) NewIssue(username string) *dgrl.Branch {
-	id := uuid.New()
-	issue := dgrl.NewBranch(id)
+// NewIssue adds and returns pointers to new issues
+func (l *Lit) NewIssues(username string, num int) []*dgrl.Branch {
+	issues := make([]*dgrl.Branch, num)
 	stamp := Stamp(username)
-	issue.Append(dgrl.NewLeaf("created", stamp))
-	issue.Append(dgrl.NewLeaf("updated", stamp))
-	issue.Append(dgrl.NewLeaf("closed", ""))
-	issue.Append(dgrl.NewLeaf("summary", ""))
-	issue.Append(dgrl.NewLeaf("tags", ""))
-	issue.Append(dgrl.NewLeaf("priority", ""))
-	issue.Append(dgrl.NewLeaf("assigned", ""))
-	issue.Append(dgrl.NewLongLeaf("description", ""))
-	l.issues.Append(issue)
-	return issue
+	for i := range issues {
+		id := uuid.New()
+		issue := dgrl.NewBranch(id)
+		issue.Append(dgrl.NewLeaf("created", stamp))
+		issue.Append(dgrl.NewLeaf("updated", stamp))
+		issue.Append(dgrl.NewLeaf("closed", ""))
+		issue.Append(dgrl.NewLeaf("summary", ""))
+		issue.Append(dgrl.NewLeaf("tags", ""))
+		issue.Append(dgrl.NewLeaf("priority", ""))
+		issue.Append(dgrl.NewLeaf("assigned", ""))
+		issue.Append(dgrl.NewLongLeaf("description", ""))
+		l.issues.Append(issue)
+		issues[i] = issue
+	}
+	l.IndexIssues()
+	return issues
+}
+
+func (l *Lit) IndexIssues() {
+	l.issueIds = make([]string, l.issues.NumKids())
+	l.issueMap = make(map[string]*dgrl.Branch, l.issues.NumKids())
+	for i, k := range l.issues.Kids() {
+		if issue, ok := k.(*dgrl.Branch); ok {
+			id := issue.Key()
+			l.issueIds[i] = id
+			l.issueMap[id] = issue
+		}
+	}
+	sort.Sort(sort.StringSlice(l.issueIds))
 }
 
 // Issue returns an issue for the given id
 func (l *Lit) Issue(id string) *dgrl.Branch {
-	for _, k := range l.issues.Kids() {
-		if issue, ok := k.(*dgrl.Branch); ok && strings.HasPrefix(issue.Key(), id) {
-			return issue
-		}
+	idx := sort.SearchStrings(l.issueIds, id)
+	if idx < len(l.issueIds) && strings.HasPrefix(l.issueIds[idx], id) {
+		return l.issueMap[l.issueIds[idx]]
 	}
 	return nil
 }

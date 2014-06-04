@@ -122,8 +122,8 @@ func newCmd() {
 		numIssues = int(num)
 	}
 	loadIssues()
-	for i := 0; i < numIssues; i++ {
-		issue := it.NewIssue(username)
+	issues := it.NewIssues(username, numIssues)
+	for _, issue := range issues {
 		fmt.Println(issue.Key())
 	}
 	storeIssues()
