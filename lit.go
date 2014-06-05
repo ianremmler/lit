@@ -46,15 +46,19 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 	if issue == nil {
 		return false
 	}
-	for _, k := range issue.Kids() {
+	idx := 0
+	for i, k := range issue.Kids() {
 		if leaf, ok := k.(*dgrl.Leaf); ok {
+			if leaf.Type() == dgrl.LeafType {
+				idx = i
+			}
 			if strings.HasPrefix(leaf.Key(), key) {
 				leaf.SetValue(val)
 				return true
 			}
 		}
 	}
-	return false
+	return issue.Insert(dgrl.NewLeaf(key, val), idx+1)
 }
 
 // Lit stores and manipulates issues
