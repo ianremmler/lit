@@ -97,19 +97,20 @@ func (l *Lit) indexIssues() {
 }
 
 // Load parses the issue file and populates the list of issues
-func (l *Lit) Load() error {
+func (l *Lit) Load() (string, error) {
 	issueFile, err := openFile(issueFilename, os.O_RDONLY, 0)
+	pathname := issueFile.Name()
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer issueFile.Close()
 	issues := dgrl.NewParser().Parse(issueFile)
 	if issues == nil {
-		return errors.New("error parsing issue file")
+		return "", errors.New("error parsing issue file")
 	}
 	l.issues = issues
 	l.indexIssues()
-	return nil
+	return pathname, nil
 }
 
 // Store writes the issue list to the file

@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"os/user"
+	"path"
 	"strconv"
 	"strings"
 
@@ -96,6 +98,8 @@ func main() {
 		tagCmd()
 	case "comment":
 		commentCmd()
+	case "attach":
+		attachCmd()
 	case "edit":
 		editCmd()
 	case "close", "reopen":
@@ -358,7 +362,7 @@ func commentCmd() {
 func editComment() string {
 	editor := getEditor()
 	if editor == "" {
-		log.Fatalln("comment: VISUAL or EDITOR environment variable must be set")
+		log.Fatalf("%s: VISUAL or EDITOR environment variable must be set\n", cmd)
 	}
 	// create temp file
 	tempFile, err := ioutil.TempFile("", "lit-")
@@ -379,13 +383,55 @@ func editComment() string {
 	newStat, err := os.Stat(filename)
 	checkErr(err)
 	if newStat.ModTime() == origStat.ModTime() {
-		log.Fatalln("comment: file unchanged")
+		log.Fatalf("%s: file unchanged", cmd)
 	}
 
 	// read comment from file
 	commentData, err := ioutil.ReadFile(filename)
 	checkErr(err)
 	return string(commentData)
+}
+
+func attachCmd() {
+	if len(args) < 2 {
+		log.Fatalln("attach: you must specify an issue and file")
+	}
+	id := args[0]
+	issuePath := loadIssues()
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalf("attach: error finding issue %s\n", id)
+	}
+	dir := path.Join(path.Dir(issuePath), issue.Key())
+	if err := os.Mkdir(dir, 0777); !os.IsExist(err) {
+		checkErr(err)
+	}
+
+	src := args[1]
+	srcFilename := path.Base(src)
+	dst := path.Join(dir, srcFilename)
+	err := cp(src, dst)
+	checkErr(err)
+
+	comment := ""
+	if len(args) > 2 {
+		comment += args[2]
+	} else {
+		comment += editComment()
+	}
+	attachComment := fmt.Sprintf("Attached %s", srcFilename)
+	if comment != "" {
+		attachComment += fmt.Sprintf("\n\n%s", comment)
+	}
+
+	stamp := lit.Stamp(username)
+	commentBranch := dgrl.NewBranch(stamp)
+	commentBranch.Append(dgrl.NewText(attachComment))
+	issue.Append(commentBranch)
+	if !lit.Set(issue, "updated", stamp) {
+		log.Printf("attach: error setting update time for issue %s\n", id)
+	}
+	storeIssues()
 }
 
 func listInfo(issue *dgrl.Branch) string {
@@ -462,9 +508,10 @@ func specIds(isDefaultOpen bool) []string {
 	return ids
 }
 
-func loadIssues() {
-	err := it.Load()
+func loadIssues() string {
+	pathname, err := it.Load()
 	checkErr(err)
+	return pathname
 }
 
 func storeIssues() {
@@ -484,4 +531,21 @@ func getEditor() string {
 		editor = os.Getenv("EDITOR")
 	}
 	return editor
+}
+
+func cp(src, dst string) error {
+	sf, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+	df, err := os.Create(dst)
+	if err != nil && !os.IsExist(err) {
+		return err
+	}
+	defer sf.Close()
+	if _, err := io.Copy(df, sf); err != nil {
+		return err
+	}
+	return nil
 }
