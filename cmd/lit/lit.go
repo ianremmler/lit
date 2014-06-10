@@ -18,20 +18,22 @@ import (
 
 const usage = `usage:
 
-lit [help | usage]              Show usage
-lit init                        Initialize new issue tracker
-lit new [<num>]                 Create num new issues (default: 1)
-lit list [<sort>] <spec>        Show list of specified issues (default: open)
-lit id [<sort>] <spec>          List ids of specified issues (default: open)
-lit show [<sort>] <spec>        Show specified issues (default: open)
-lit set <key> <val> <spec>      Set value for key in specified issues
-lit tag (add|del) <tag> <spec>  Add or delete tag in specified issues
-lit comment <id> [<text>]       Add issue comment (open editor if no text given)
-lit edit <spec>                 Edit specified issues (default: open)
-lit close <spec>                Close specified issues
-lit reopen <spec>               Reopen specified issues
+lit [help | usage]               Show usage
+lit init                         Initialize new issue tracker
+lit new [<num>]                  Create num new issues (default: 1)
+lit id [<sort>] <spec>           List ids of specified issues (default: open)
+lit list [<sort>] <spec>         Show list of specified issues (default: open)
+lit show [<sort>] <spec>         Show specified issues (default: open)
+lit set <key> <val> <spec>       Set value for key in specified issues
+lit tag (add|del) <tag> <spec>   Add or delete tag in specified issues
+lit comment <id> [<text>]        Add issue comment (default: edit text)
+lit attach <id> <file> [<desc>]  Attach file (default: edit description)
+lit edit <spec>                  Edit specified issues (default: open)
+lit close <spec>                 Close specified issues
+lit reopen <spec>                Reopen specified issues
 
-sort: (sortby|rsortby) <key>  Sort (reverse if rsortby) based on key
+sort: (sortby|rsortby) <key>
+	Sort (reverse if rsortby) based on key
 
 spec: all | <ids> | (with|without) <key> [<val>] | (less|greater) <key> <val>
 	Specifies which issues to operate on
@@ -82,14 +84,14 @@ func main() {
 	switch cmd {
 	case "", "-h", "-help", "--help", "help", "-u", "-usage", "--usage", "usage":
 		usageCmd()
-	case "list":
-		listCmd()
 	case "init":
 		initCmd()
 	case "new":
 		newCmd()
 	case "id":
 		idCmd()
+	case "list":
+		listCmd()
 	case "show":
 		showCmd()
 	case "set":
@@ -133,6 +135,20 @@ func newCmd() {
 	storeIssues()
 }
 
+func idCmd() {
+	loadIssues()
+	doSort, key, doAscend := dispOpts()
+	ids := specIds(!isStdinPipe)
+	if doSort {
+		it.Sort(ids, key, doAscend)
+	}
+	for _, id := range ids {
+		if issue := it.Issue(id); issue != nil {
+			fmt.Println(issue.Key())
+		}
+	}
+}
+
 func listCmd() {
 	loadIssues()
 	doSort, key, doAscend := dispOpts()
@@ -145,20 +161,6 @@ func listCmd() {
 		issue := it.Issue(id)
 		if issue != nil {
 			fmt.Println(listInfo(issue))
-		}
-	}
-}
-
-func idCmd() {
-	loadIssues()
-	doSort, key, doAscend := dispOpts()
-	ids := specIds(!isStdinPipe)
-	if doSort {
-		it.Sort(ids, key, doAscend)
-	}
-	for _, id := range ids {
-		if issue := it.Issue(id); issue != nil {
-			fmt.Println(issue.Key())
 		}
 	}
 }
@@ -222,111 +224,6 @@ func tagCmd() {
 		ok = ok && lit.Set(issue, "updated", stamp)
 		if !ok {
 			log.Printf("tag: error updating fields in issue %s\n", id)
-			continue
-		}
-	}
-	storeIssues()
-}
-
-func editCmd() {
-	editor := getEditor()
-	if editor == "" {
-		log.Fatalln("edit: VISUAL or EDITOR environment variable must be set")
-	}
-
-	loadIssues()
-
-	// create temp file
-	tempFile, err := ioutil.TempFile("", "lit-")
-	checkErr(err)
-	filename := tempFile.Name()
-
-	// load issue content into temp file
-	ids := specIds(!isStdinPipe)
-	toEdit := dgrl.NewRoot()
-	for _, id := range ids {
-		issue := it.Issue(id)
-		if issue == nil {
-			log.Printf("edit: error finding issue %s\n", id)
-			continue
-		}
-		toEdit.Append(issue)
-	}
-	err = toEdit.Write(tempFile)
-	checkErr(err)
-	tempFile.Close()
-
-	// get original file state
-	origStat, err := os.Stat(filename)
-	checkErr(err)
-
-	// launch editor
-	ed := exec.Command(editor, filename)
-	ed.Stdin, ed.Stdout, ed.Stderr = os.Stdin, os.Stdout, os.Stderr
-	err = ed.Run()
-	checkErr(err)
-
-	// get updated file state, compare to original
-	newStat, err := os.Stat(filename)
-	checkErr(err)
-	if newStat.ModTime() == origStat.ModTime() {
-		log.Fatalln("edit: file unchanged")
-	}
-
-	// parse issue from temp file
-	tempFile, err = os.Open(filename)
-	checkErr(err)
-	edIssues := dgrl.NewParser().Parse(tempFile)
-	tempFile.Close()
-	if edIssues == nil {
-		log.Fatalln("edit: error parsing file")
-	}
-
-	// update issues if we find a match
-	didUpdate := false
-	stamp := lit.Stamp(username)
-	for _, id := range ids {
-		issue := it.Issue(id)
-		if issue == nil {
-			// already printed error, so don't repeat here
-			continue
-		}
-		for _, node := range edIssues.Kids() {
-			if ed, ok := node.(*dgrl.Branch); ok && strings.HasPrefix(ed.Key(), id) {
-				*issue = *ed
-				if !lit.Set(issue, "updated", stamp) {
-					log.Printf("edit: error setting update time for issue %s\n", id)
-					continue
-				}
-				didUpdate = true
-				break
-			}
-		}
-	}
-	if !didUpdate {
-		log.Fatalln("edit: did not update anything")
-	}
-
-	storeIssues()
-}
-
-func closeCmd() {
-	loadIssues()
-	stamp := lit.Stamp(username)
-	for _, id := range specIds(false) {
-		issue := it.Issue(id)
-		if issue == nil {
-			log.Printf("%s: error finding issue %s\n", cmd, id)
-			continue
-		}
-		closedStamp := ""
-		if cmd == "close" {
-			closedStamp = stamp
-		}
-		ok := lit.Set(issue, "closed", closedStamp)
-		ok = ok && lit.Set(issue, "updated", stamp)
-		if !ok {
-			log.Printf("%s: error updating fields for issue %s\n", cmd, id)
 			continue
 		}
 	}
@@ -433,6 +330,111 @@ func attachCmd() {
 	issue.Append(commentBranch)
 	if !lit.Set(issue, "updated", stamp) {
 		log.Printf("attach: error setting update time for issue %s\n", id)
+	}
+	storeIssues()
+}
+
+func editCmd() {
+	editor := getEditor()
+	if editor == "" {
+		log.Fatalln("edit: VISUAL or EDITOR environment variable must be set")
+	}
+
+	loadIssues()
+
+	// create temp file
+	tempFile, err := ioutil.TempFile("", "lit-")
+	checkErr(err)
+	filename := tempFile.Name()
+
+	// load issue content into temp file
+	ids := specIds(!isStdinPipe)
+	toEdit := dgrl.NewRoot()
+	for _, id := range ids {
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Printf("edit: error finding issue %s\n", id)
+			continue
+		}
+		toEdit.Append(issue)
+	}
+	err = toEdit.Write(tempFile)
+	checkErr(err)
+	tempFile.Close()
+
+	// get original file state
+	origStat, err := os.Stat(filename)
+	checkErr(err)
+
+	// launch editor
+	ed := exec.Command(editor, filename)
+	ed.Stdin, ed.Stdout, ed.Stderr = os.Stdin, os.Stdout, os.Stderr
+	err = ed.Run()
+	checkErr(err)
+
+	// get updated file state, compare to original
+	newStat, err := os.Stat(filename)
+	checkErr(err)
+	if newStat.ModTime() == origStat.ModTime() {
+		log.Fatalln("edit: file unchanged")
+	}
+
+	// parse issue from temp file
+	tempFile, err = os.Open(filename)
+	checkErr(err)
+	edIssues := dgrl.NewParser().Parse(tempFile)
+	tempFile.Close()
+	if edIssues == nil {
+		log.Fatalln("edit: error parsing file")
+	}
+
+	// update issues if we find a match
+	didUpdate := false
+	stamp := lit.Stamp(username)
+	for _, id := range ids {
+		issue := it.Issue(id)
+		if issue == nil {
+			// already printed error, so don't repeat here
+			continue
+		}
+		for _, node := range edIssues.Kids() {
+			if ed, ok := node.(*dgrl.Branch); ok && strings.HasPrefix(ed.Key(), id) {
+				*issue = *ed
+				if !lit.Set(issue, "updated", stamp) {
+					log.Printf("edit: error setting update time for issue %s\n", id)
+					continue
+				}
+				didUpdate = true
+				break
+			}
+		}
+	}
+	if !didUpdate {
+		log.Fatalln("edit: did not update anything")
+	}
+
+	storeIssues()
+}
+
+func closeCmd() {
+	loadIssues()
+	stamp := lit.Stamp(username)
+	for _, id := range specIds(false) {
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Printf("%s: error finding issue %s\n", cmd, id)
+			continue
+		}
+		closedStamp := ""
+		if cmd == "close" {
+			closedStamp = stamp
+		}
+		ok := lit.Set(issue, "closed", closedStamp)
+		ok = ok && lit.Set(issue, "updated", stamp)
+		if !ok {
+			log.Printf("%s: error updating fields for issue %s\n", cmd, id)
+			continue
+		}
 	}
 	storeIssues()
 }
