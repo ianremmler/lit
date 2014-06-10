@@ -402,16 +402,11 @@ func attachCmd() {
 	if issue == nil {
 		log.Fatalf("attach: error finding issue %s\n", id)
 	}
-	dir := path.Join(path.Dir(issuePath), issue.Key())
-	if err := os.Mkdir(dir, 0777); !os.IsExist(err) {
-		checkErr(err)
-	}
 
 	src := args[1]
-	srcFilename := path.Base(src)
-	dst := path.Join(dir, srcFilename)
-	err := cp(src, dst)
+	_, err := os.Stat(src)
 	checkErr(err)
+	srcFilename := path.Base(src)
 
 	comment := ""
 	if len(args) > 2 {
@@ -423,6 +418,14 @@ func attachCmd() {
 	if comment != "" {
 		attachComment += fmt.Sprintf("\n\n%s", comment)
 	}
+
+	dir := path.Join(path.Dir(issuePath), issue.Key())
+	if err := os.Mkdir(dir, 0777); !os.IsExist(err) {
+		checkErr(err)
+	}
+	dst := path.Join(dir, srcFilename)
+	err = cp(src, dst)
+	checkErr(err)
 
 	stamp := lit.Stamp(username)
 	commentBranch := dgrl.NewBranch(stamp)
