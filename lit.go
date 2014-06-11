@@ -63,9 +63,10 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 
 // Lit stores and manipulates issues
 type Lit struct {
-	issues   *dgrl.Branch
-	issueIds []string
-	issueMap map[string]*dgrl.Branch
+	issues    *dgrl.Branch
+	issueIds  []string
+	issueMap  map[string]*dgrl.Branch
+	issuePath string
 }
 
 // New constructs a new Lit.
@@ -83,6 +84,8 @@ func (l *Lit) Init() error {
 	return nil
 }
 
+func (l *Lit) IssueFile() string { return l.issuePath }
+
 func (l *Lit) indexIssues() {
 	l.issueIds = make([]string, l.issues.NumKids())
 	l.issueMap = make(map[string]*dgrl.Branch, l.issues.NumKids())
@@ -97,20 +100,20 @@ func (l *Lit) indexIssues() {
 }
 
 // Load parses the issue file and populates the list of issues
-func (l *Lit) Load() (string, error) {
+func (l *Lit) Load() error {
 	issueFile, err := openFile(issueFilename, os.O_RDONLY, 0)
-	pathname := issueFile.Name()
+	l.issuePath = issueFile.Name()
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer issueFile.Close()
 	issues := dgrl.NewParser().Parse(issueFile)
 	if issues == nil {
-		return "", errors.New("error parsing issue file")
+		return errors.New("error parsing issue file")
 	}
 	l.issues = issues
 	l.indexIssues()
-	return pathname, nil
+	return nil
 }
 
 // Store writes the issue list to the file

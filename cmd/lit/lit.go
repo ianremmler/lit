@@ -175,7 +175,7 @@ func idCmd() {
 }
 
 func listCmd() {
-	issuePath := loadIssues()
+	loadIssues()
 	doSort, key, doAscend := dispOpts()
 	ids := specIds(!isStdinPipe)
 	if doSort {
@@ -185,7 +185,7 @@ func listCmd() {
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue != nil {
-			fmt.Println(listInfo(issue, path.Dir(issuePath)))
+			fmt.Println(listInfo(issue))
 		}
 	}
 }
@@ -334,7 +334,7 @@ func addAttach() {
 		log.Fatalln("attach: you must specify an issue and file")
 	}
 	id := args[1]
-	issuePath := loadIssues()
+	loadIssues()
 	issue := it.Issue(id)
 	if issue == nil {
 		log.Fatalf("attach: error finding issue %s\n", id)
@@ -356,7 +356,7 @@ func addAttach() {
 		attachComment += fmt.Sprintf("\n\n%s", comment)
 	}
 
-	dir := path.Join(path.Dir(issuePath), issue.Key())
+	dir := issueDir(issue)
 	if err := os.Mkdir(dir, 0777); !os.IsExist(err) {
 		checkErr(err)
 	}
@@ -379,12 +379,12 @@ func listAttach() {
 		log.Fatalln("attach: you must specify an issue")
 	}
 	id := args[1]
-	issuePath := loadIssues()
+	loadIssues()
 	issue := it.Issue(id)
 	if issue == nil {
 		log.Fatalf("attach: error finding issue %s\n", id)
 	}
-	issueDir := path.Join(path.Dir(issuePath), issue.Key())
+	issueDir := issueDir(issue)
 	dir, err := ioutil.ReadDir(issueDir)
 	if err != nil {
 		return
@@ -399,12 +399,12 @@ func showAttach() {
 		log.Fatalln("attach: you must specify an issue and file")
 	}
 	id := args[1]
-	issuePath := loadIssues()
+	loadIssues()
 	issue := it.Issue(id)
 	if issue == nil {
 		log.Fatalf("attach: error finding issue %s\n", id)
 	}
-	attachPath := path.Join(path.Dir(issuePath), issue.Key(), args[2])
+	attachPath := path.Join(issueDir(issue), args[2])
 	attach, err := os.Open(attachPath)
 	checkErr(err)
 	_, err = io.Copy(os.Stdout, attach)
@@ -516,7 +516,7 @@ func closeCmd() {
 	storeIssues()
 }
 
-func listInfo(issue *dgrl.Branch, litDir string) string {
+func listInfo(issue *dgrl.Branch) string {
 	status := " "
 	closed, _ := lit.Get(issue, "closed")
 	if len(closed) > 0 {
@@ -525,7 +525,7 @@ func listInfo(issue *dgrl.Branch, litDir string) string {
 	tags, _ := lit.Get(issue, "tags")
 	priority, _ := lit.Get(issue, "priority")
 	attached := " "
-	issueDir := path.Join(litDir, issue.Key())
+	issueDir := issueDir(issue)
 	if dir, err := ioutil.ReadDir(issueDir); err == nil {
 		attached = "*"
 		numAttach := len(dir)
@@ -599,10 +599,9 @@ func specIds(isDefaultOpen bool) []string {
 	return ids
 }
 
-func loadIssues() string {
-	pathname, err := it.Load()
+func loadIssues() {
+	err := it.Load()
 	checkErr(err)
-	return pathname
 }
 
 func storeIssues() {
@@ -639,4 +638,11 @@ func cp(src, dst string) error {
 		return err
 	}
 	return nil
+}
+
+func issueDir(issue *dgrl.Branch) string {
+	if issue == nil {
+		return ""
+	}
+	return path.Join(path.Dir(it.IssueFile()), issue.Key())
 }
