@@ -18,19 +18,44 @@ import (
 
 const usage = `usage:
 
-lit [help | usage]               Show usage
-lit init                         Initialize new issue tracker
-lit new [<num>]                  Create num new issues (default: 1)
-lit id [<sort>] <spec>           List ids of specified issues (default: open)
-lit list [<sort>] <spec>         Show list of specified issues (default: open)
-lit show [<sort>] <spec>         Show specified issues (default: open)
-lit set <key> <val> <spec>       Set value for key in specified issues
-lit tag (add|del) <tag> <spec>   Add or delete tag in specified issues
-lit comment <id> [<text>]        Add issue comment (default: edit text)
-lit attach <id> <file> [<desc>]  Attach file (default: edit description)
-lit edit <spec>                  Edit specified issues (default: open)
-lit close <spec>                 Close specified issues
-lit reopen <spec>                Reopen specified issues
+lit [help | usage]
+	Show usage
+
+lit init
+	Initialize new issue tracker
+
+lit new [<num>]
+	Create num new issues (default: 1)
+
+lit id [<sort>] <spec>
+	List ids of specified issues (default: open)
+
+lit list [<sort>] <spec>
+	Show list of specified issues (default: open)
+
+lit show [<sort>] <spec>
+	Show specified issues (default: open)
+
+lit set <key> <val> <spec>
+	Set value for key in specified issues
+
+lit tag (add|del) <tag> <spec>
+	Add or delete tag in specified issues
+
+lit comment <id> [<text>]
+	Add issue comment (default: edit text)
+
+lit attach (add <id> <file> [<desc>] | list <id>)
+	Attach file (default: edit description) or list attached files
+
+lit edit <spec>
+	Edit specified issues (default: open)
+
+lit close <spec>
+	Close specified issues
+
+lit reopen <spec>
+	Reopen specified issues
 
 sort: (sortby|rsortby) <key>
 	Sort (reverse if rsortby) based on key
@@ -41,14 +66,14 @@ spec: all | <ids> | (with|without) <key> [<val>] | (less|greater) <key> <val>
 	Use 'comment' key to filter by comment contents and times`
 
 const (
-	// id, closed?, priority, assigned, tags, summary
-	listFmt = "%-8.8s %-1.1s %-1.1s %-8.8s %-17.17s %s"
+	// id, closed?, priority, attached, assigned, tags, summary
+	listFmt = "%-8.8s %-1.1s %-1.1s %-1.1s %-8.8s %-15.15s %s"
 )
 
 var (
 	args        = os.Args[1:]
 	it          = lit.New()
-	listHdr     = fmt.Sprintf(listFmt, "id", "c", "p", "assigned", "tags", "summary")
+	listHdr     = fmt.Sprintf(listFmt, "id", "c", "p", "a", "assigned", "tags", "summary")
 	username    = "?"
 	isStdinPipe = false
 	cmd         string
@@ -150,7 +175,7 @@ func idCmd() {
 }
 
 func listCmd() {
-	loadIssues()
+	issuePath := loadIssues()
 	doSort, key, doAscend := dispOpts()
 	ids := specIds(!isStdinPipe)
 	if doSort {
@@ -160,7 +185,7 @@ func listCmd() {
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue != nil {
-			fmt.Println(listInfo(issue))
+			fmt.Println(listInfo(issue, path.Dir(issuePath)))
 		}
 	}
 }
@@ -182,7 +207,6 @@ func setCmd() {
 		log.Fatalln("set: you must specify a key and value")
 	}
 	key, val := args[0], args[1]
-	args = args[2:]
 	loadIssues()
 	stamp := lit.Stamp(username)
 	for _, id := range specIds(false) {
@@ -207,11 +231,10 @@ func tagCmd() {
 	}
 	op, tag := args[0], args[1]
 	if op != "add" && op != "del" {
-		log.Fatalf("tag: is not a valid operation\n")
+		log.Fatalf("tag: %s is not a valid operation\n", op)
 	}
 	doAdd := (op == "add")
 
-	args = args[2:]
 	loadIssues()
 	stamp := lit.Stamp(username)
 	for _, id := range specIds(false) {
@@ -290,24 +313,42 @@ func editComment() string {
 }
 
 func attachCmd() {
-	if len(args) < 2 {
-		log.Fatalln("attach: you must specify an issue and file")
+	if len(args) < 1 {
+		log.Fatalln("attach: you must specify an operation")
 	}
-	id := args[0]
+	op := args[0]
+	switch op {
+	case "add":
+		if len(args) < 3 {
+			log.Fatalln("attach: you must specify an issue and file")
+		}
+		addAttach()
+	case "list":
+		if len(args) < 1 {
+			log.Fatalln("attach: you must specify an issue")
+		}
+		listAttach()
+	default:
+		log.Fatalf("attach: %s is not a valid operation\n", op)
+	}
+}
+
+func addAttach() {
+	id := args[1]
 	issuePath := loadIssues()
 	issue := it.Issue(id)
 	if issue == nil {
 		log.Fatalf("attach: error finding issue %s\n", id)
 	}
 
-	src := args[1]
+	src := args[2]
 	_, err := os.Stat(src)
 	checkErr(err)
 	srcFilename := path.Base(src)
 
 	comment := ""
-	if len(args) > 2 {
-		comment += args[2]
+	if len(args) > 3 {
+		comment += args[3]
 	} else {
 		comment += editComment()
 	}
@@ -332,6 +373,24 @@ func attachCmd() {
 		log.Printf("attach: error setting update time for issue %s\n", id)
 	}
 	storeIssues()
+}
+
+func listAttach() {
+	if len(args) < 1 {
+		log.Fatalln("attach: you must specify an issue")
+	}
+	id := args[1]
+	issuePath := loadIssues()
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalf("attach: error finding issue %s\n", id)
+	}
+	issueDir := path.Join(path.Dir(issuePath), issue.Key())
+	dir, err := ioutil.ReadDir(issueDir)
+	checkErr(err)
+	for i := range dir {
+		fmt.Println(dir[i].Name())
+	}
 }
 
 func editCmd() {
@@ -439,7 +498,7 @@ func closeCmd() {
 	storeIssues()
 }
 
-func listInfo(issue *dgrl.Branch) string {
+func listInfo(issue *dgrl.Branch, litDir string) string {
 	status := " "
 	closed, _ := lit.Get(issue, "closed")
 	if len(closed) > 0 {
@@ -447,9 +506,18 @@ func listInfo(issue *dgrl.Branch) string {
 	}
 	tags, _ := lit.Get(issue, "tags")
 	priority, _ := lit.Get(issue, "priority")
+	attached := " "
+	issueDir := path.Join(litDir, issue.Key())
+	if dir, err := ioutil.ReadDir(issueDir); err == nil {
+		attached = "*"
+		numAttach := len(dir)
+		if numAttach < 10 {
+			attached = strconv.Itoa(numAttach)
+		}
+	}
 	assigned, _ := lit.Get(issue, "assigned")
 	summary, _ := lit.Get(issue, "summary")
-	return fmt.Sprintf(listFmt, issue.Key(), status, priority, assigned, tags, summary)
+	return fmt.Sprintf(listFmt, issue.Key(), status, priority, attached, assigned, tags, summary)
 }
 
 func keyval(kv []string) (string, string) {
