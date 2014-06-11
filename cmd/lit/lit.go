@@ -45,8 +45,8 @@ lit tag (add|del) <tag> <spec>
 lit comment <id> [<text>]
 	Add issue comment (default: edit text)
 
-lit attach (add <id> <file> [<desc>] | list <id>)
-	Attach file (default: edit description) or list attached files
+lit attach (add <id> <file> [<desc>] | show <id> <file> | list <id>)
+	Add, show, or list issue attachments
 
 lit edit <spec>
 	Edit specified issues (default: open)
@@ -319,21 +319,20 @@ func attachCmd() {
 	op := args[0]
 	switch op {
 	case "add":
-		if len(args) < 3 {
-			log.Fatalln("attach: you must specify an issue and file")
-		}
 		addAttach()
 	case "list":
-		if len(args) < 1 {
-			log.Fatalln("attach: you must specify an issue")
-		}
 		listAttach()
+	case "show":
+		showAttach()
 	default:
 		log.Fatalf("attach: %s is not a valid operation\n", op)
 	}
 }
 
 func addAttach() {
+	if len(args) < 3 {
+		log.Fatalln("attach: you must specify an issue and file")
+	}
 	id := args[1]
 	issuePath := loadIssues()
 	issue := it.Issue(id)
@@ -376,7 +375,7 @@ func addAttach() {
 }
 
 func listAttach() {
-	if len(args) < 1 {
+	if len(args) < 2 {
 		log.Fatalln("attach: you must specify an issue")
 	}
 	id := args[1]
@@ -387,10 +386,29 @@ func listAttach() {
 	}
 	issueDir := path.Join(path.Dir(issuePath), issue.Key())
 	dir, err := ioutil.ReadDir(issueDir)
-	checkErr(err)
+	if err != nil {
+		return
+	}
 	for i := range dir {
 		fmt.Println(dir[i].Name())
 	}
+}
+
+func showAttach() {
+	if len(args) < 3 {
+		log.Fatalln("attach: you must specify an issue and file")
+	}
+	id := args[1]
+	issuePath := loadIssues()
+	issue := it.Issue(id)
+	if issue == nil {
+		log.Fatalf("attach: error finding issue %s\n", id)
+	}
+	attachPath := path.Join(path.Dir(issuePath), issue.Key(), args[2])
+	attach, err := os.Open(attachPath)
+	checkErr(err)
+	_, err = io.Copy(os.Stdout, attach)
+	checkErr(err)
 }
 
 func editCmd() {
