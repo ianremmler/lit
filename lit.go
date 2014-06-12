@@ -4,6 +4,8 @@ package lit
 import (
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"sort"
@@ -85,6 +87,13 @@ func (l *Lit) Init() error {
 }
 
 func (l *Lit) IssueFile() string { return l.issuePath }
+
+func (l *Lit) IssueDir(issue *dgrl.Branch) string {
+	if issue == nil {
+		return ""
+	}
+	return path.Join(path.Dir(l.issuePath), issue.Key())
+}
 
 func (l *Lit) indexIssues() {
 	l.issueIds = make([]string, l.issues.NumKids())
@@ -223,10 +232,10 @@ func (l *Lit) Sort(ids []string, key string, doAscend bool) {
 // Compare returns a list of ids for all issues whose value for key is less
 // or greater, determined by isLess, than val.
 func (l *Lit) Compare(key, val string, isLess bool) []string {
-	matches := []string{}
 	if val == "" {
-		return matches
+		return nil
 	}
+	matches := []string{}
 	for _, k := range l.issues.Kids() {
 		if issue, ok := k.(*dgrl.Branch); ok {
 			if compare(issue, key, val, isLess) == isLess {
@@ -331,6 +340,50 @@ func setToTagStr(set map[string]struct{}) string {
 	return strings.TrimSpace(strings.Join(tags, " "))
 }
 
+func (l *Lit) Attach(issue *dgrl.Branch, src, username, comment string) (string, error) {
+	filename := path.Base(src)
+	attachComment := fmt.Sprintf("Attached %s", filename)
+	if comment != "" {
+		attachComment += fmt.Sprintf("\n\n%s", comment)
+	}
+	dir := l.IssueDir(issue)
+	if err := os.Mkdir(dir, 0777); !os.IsExist(err) {
+		return "", err
+	}
+	dst := path.Join(dir, path.Base(filename))
+	if err := cp(src, dst); err != nil {
+		return "", err
+	}
+	stamp := Stamp(username)
+	commentBranch := dgrl.NewBranch(stamp)
+	commentBranch.Append(dgrl.NewText(attachComment))
+	issue.Append(commentBranch)
+	return stamp, nil
+}
+
+func (l *Lit) Attachments(issue *dgrl.Branch) []string {
+	if issue == nil {
+		return nil
+	}
+	issueDir := l.IssueDir(issue)
+	dir, err := ioutil.ReadDir(issueDir)
+	if err != nil {
+		return nil
+	}
+	attachments := make([]string, len(dir))
+	for i := range dir {
+		attachments[i] = dir[i].Name()
+	}
+	return attachments
+}
+
+func (l *Lit) GetAttachment(issue *dgrl.Branch, filename string) (*os.File, error) {
+	if issue == nil {
+		return nil, errors.New("nil issue")
+	}
+	return os.Open(path.Join(l.IssueDir(issue), filename))
+}
+
 func openFile(filename string, flag int, perm os.FileMode) (*os.File, error) {
 	if path.IsAbs(filename) {
 		return os.OpenFile(filename, flag, perm)
@@ -346,4 +399,21 @@ func openFile(filename string, flag int, perm os.FileMode) (*os.File, error) {
 		pp, p = p, path.Join(path.Dir(path.Dir(p)), path.Base(p))
 	}
 	return nil, errors.New(fmt.Sprintf("file '%s' not found", filename))
+}
+
+func cp(src, dst string) error {
+	sf, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+	df, err := os.Create(dst)
+	if err != nil && !os.IsExist(err) {
+		return err
+	}
+	defer sf.Close()
+	if _, err := io.Copy(df, sf); err != nil {
+		return err
+	}
+	return nil
 }

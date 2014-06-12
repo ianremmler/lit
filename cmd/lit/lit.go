@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"path"
 	"strconv"
 	"strings"
 
@@ -343,7 +342,6 @@ func addAttach() {
 	src := args[2]
 	_, err := os.Stat(src)
 	checkErr(err)
-	srcFilename := path.Base(src)
 
 	comment := ""
 	if len(args) > 3 {
@@ -351,23 +349,9 @@ func addAttach() {
 	} else {
 		comment += editComment()
 	}
-	attachComment := fmt.Sprintf("Attached %s", srcFilename)
-	if comment != "" {
-		attachComment += fmt.Sprintf("\n\n%s", comment)
-	}
 
-	dir := issueDir(issue)
-	if err := os.Mkdir(dir, 0777); !os.IsExist(err) {
-		checkErr(err)
-	}
-	dst := path.Join(dir, srcFilename)
-	err = cp(src, dst)
+	stamp, err := it.Attach(issue, src, username, comment)
 	checkErr(err)
-
-	stamp := lit.Stamp(username)
-	commentBranch := dgrl.NewBranch(stamp)
-	commentBranch.Append(dgrl.NewText(attachComment))
-	issue.Append(commentBranch)
 	if !lit.Set(issue, "updated", stamp) {
 		log.Printf("attach: error setting update time for issue %s\n", id)
 	}
@@ -384,13 +368,8 @@ func listAttach() {
 	if issue == nil {
 		log.Fatalf("attach: error finding issue %s\n", id)
 	}
-	issueDir := issueDir(issue)
-	dir, err := ioutil.ReadDir(issueDir)
-	if err != nil {
-		return
-	}
-	for i := range dir {
-		fmt.Println(dir[i].Name())
+	for _, filename := range it.Attachments(issue) {
+		fmt.Println(filename)
 	}
 }
 
@@ -404,10 +383,10 @@ func showAttach() {
 	if issue == nil {
 		log.Fatalf("attach: error finding issue %s\n", id)
 	}
-	attachPath := path.Join(issueDir(issue), args[2])
-	attach, err := os.Open(attachPath)
+	attachment, err := it.GetAttachment(issue, args[2])
 	checkErr(err)
-	_, err = io.Copy(os.Stdout, attach)
+	defer attachment.Close()
+	_, err = io.Copy(os.Stdout, attachment)
 	checkErr(err)
 }
 
@@ -525,10 +504,8 @@ func listInfo(issue *dgrl.Branch) string {
 	tags, _ := lit.Get(issue, "tags")
 	priority, _ := lit.Get(issue, "priority")
 	attached := " "
-	issueDir := issueDir(issue)
-	if dir, err := ioutil.ReadDir(issueDir); err == nil {
+	if numAttach := len(it.Attachments(issue)); numAttach > 0 {
 		attached = "*"
-		numAttach := len(dir)
 		if numAttach < 10 {
 			attached = strconv.Itoa(numAttach)
 		}
@@ -621,28 +598,4 @@ func getEditor() string {
 		editor = os.Getenv("EDITOR")
 	}
 	return editor
-}
-
-func cp(src, dst string) error {
-	sf, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer sf.Close()
-	df, err := os.Create(dst)
-	if err != nil && !os.IsExist(err) {
-		return err
-	}
-	defer sf.Close()
-	if _, err := io.Copy(df, sf); err != nil {
-		return err
-	}
-	return nil
-}
-
-func issueDir(issue *dgrl.Branch) string {
-	if issue == nil {
-		return ""
-	}
-	return path.Join(path.Dir(it.IssueFile()), issue.Key())
 }
