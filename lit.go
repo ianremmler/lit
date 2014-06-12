@@ -86,8 +86,10 @@ func (l *Lit) Init() error {
 	return nil
 }
 
+// IssueFile returns the name of the issue file
 func (l *Lit) IssueFile() string { return l.issuePath }
 
+// IssueDir returns the directory name that corresponds to an issue
 func (l *Lit) IssueDir(issue *dgrl.Branch) string {
 	if issue == nil {
 		return ""
@@ -340,6 +342,7 @@ func setToTagStr(set map[string]struct{}) string {
 	return strings.TrimSpace(strings.Join(tags, " "))
 }
 
+// Attach attaches a file to an issue
 func (l *Lit) Attach(issue *dgrl.Branch, src, username, comment string) (string, error) {
 	filename := path.Base(src)
 	attachComment := fmt.Sprintf("Attached %s", filename)
@@ -361,6 +364,7 @@ func (l *Lit) Attach(issue *dgrl.Branch, src, username, comment string) (string,
 	return stamp, nil
 }
 
+// Attachments returns a list of an issue's attachments
 func (l *Lit) Attachments(issue *dgrl.Branch) []string {
 	if issue == nil {
 		return nil
@@ -377,6 +381,7 @@ func (l *Lit) Attachments(issue *dgrl.Branch) []string {
 	return attachments
 }
 
+// GetAttachment returns a file attached to an issue
 func (l *Lit) GetAttachment(issue *dgrl.Branch, filename string) (*os.File, error) {
 	if issue == nil {
 		return nil, errors.New("nil issue")
