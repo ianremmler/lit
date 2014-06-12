@@ -152,7 +152,7 @@ func (l *Lit) IssueIds() []string {
 	return issueIds
 }
 
-// NewIssue adds and returns pointers to new issues
+// NewIssues adds and returns pointers to new issues
 func (l *Lit) NewIssues(username string, num int) []*dgrl.Branch {
 	issues := make([]*dgrl.Branch, num)
 	stamp := Stamp(username)
@@ -403,7 +403,7 @@ func openFile(filename string, flag int, perm os.FileMode) (*os.File, error) {
 		}
 		pp, p = p, path.Join(path.Dir(path.Dir(p)), path.Base(p))
 	}
-	return nil, errors.New(fmt.Sprintf("file '%s' not found", filename))
+	return nil, fmt.Errorf("file '%s' not found", filename)
 }
 
 func cp(src, dst string) error {
