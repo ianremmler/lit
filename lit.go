@@ -113,10 +113,10 @@ func (l *Lit) indexIssues() {
 // Load parses the issue file and populates the list of issues
 func (l *Lit) Load() error {
 	issueFile, err := openFile(issueFilename, os.O_RDONLY, 0)
-	l.issuePath = issueFile.Name()
 	if err != nil {
 		return err
 	}
+	l.issuePath = issueFile.Name()
 	defer issueFile.Close()
 	issues := dgrl.NewParser().Parse(issueFile)
 	if issues == nil {

@@ -206,6 +206,7 @@ func setCmd() {
 		log.Fatalln("set: you must specify a key and value")
 	}
 	key, val := args[0], args[1]
+	args = args[2:]
 	loadIssues()
 	stamp := lit.Stamp(username)
 	for _, id := range specIds(false) {
@@ -232,6 +233,7 @@ func tagCmd() {
 	if op != "add" && op != "del" {
 		log.Fatalf("tag: %s is not a valid operation\n", op)
 	}
+	args = args[2:]
 	doAdd := (op == "add")
 
 	loadIssues()
