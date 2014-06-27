@@ -62,7 +62,8 @@ sort: (sortby|rsortby) <key>
 spec: all | <ids> | (with|without) <key> [<val>] | (less|greater) <key> <val>
 	Specifies which issues to operate on
 	Default open spec does not apply if input is piped
-	Use 'comment' key to filter by comment contents and times`
+	Use 'comment' key to filter by comment contents and times
+	Use 'attach' key to filter by attachment names and counts`
 
 const (
 	// id, closed?, priority, attached, assigned, tags, summary

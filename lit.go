@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -188,7 +189,7 @@ func (l *Lit) Match(key, val string, doesMatch bool) []string {
 	matches := []string{}
 	for _, k := range l.issues.Kids() {
 		if issue, ok := k.(*dgrl.Branch); ok {
-			if contains(issue, key, val) == doesMatch {
+			if l.contains(issue, key, val) == doesMatch {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -240,7 +241,7 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 	matches := []string{}
 	for _, k := range l.issues.Kids() {
 		if issue, ok := k.(*dgrl.Branch); ok {
-			if compare(issue, key, val, isLess) == isLess {
+			if l.compare(issue, key, val, isLess) == isLess {
 				matches = append(matches, issue.Key())
 			}
 		}
@@ -248,9 +249,12 @@ func (l *Lit) Compare(key, val string, isLess bool) []string {
 	return matches
 }
 
-func contains(issue *dgrl.Branch, key, val string) bool {
-	if key == "comment" {
+func (l *Lit) contains(issue *dgrl.Branch, key, val string) bool {
+	switch key {
+	case "comment":
 		return commentContains(issue, val)
+	case "attach":
+		return l.attachContains(issue, val)
 	}
 	if issueVal, ok := Get(issue, key); ok {
 		if val == "" && issueVal == "" {
@@ -284,9 +288,25 @@ func commentContains(issue *dgrl.Branch, val string) bool {
 	return false
 }
 
-func compare(issue *dgrl.Branch, key, val string, isLess bool) bool {
-	if key == "comment" {
+func (l *Lit) attachContains(issue *dgrl.Branch, val string) bool {
+	att := l.Attachments(issue)
+	if val == "" {
+		return len(att) > 0
+	}
+	for _, file := range att {
+		if strings.Contains(file, val) {
+			return true
+		}
+	}
+	return false
+}
+
+func (l *Lit) compare(issue *dgrl.Branch, key, val string, isLess bool) bool {
+	switch key {
+	case "comment":
 		return commentCompare(issue, val, isLess)
+	case "attach":
+		return l.attachCompare(issue, val, isLess)
 	}
 	issueVal, ok := Get(issue, key)
 	if !ok || issueVal == "" {
@@ -312,6 +332,18 @@ func commentCompare(issue *dgrl.Branch, time string, isLess bool) bool {
 		}
 	}
 	return !isLess
+}
+
+func (l *Lit) attachCompare(issue *dgrl.Branch, val string, isLess bool) bool {
+	num, err := strconv.Atoi(val)
+	if err != nil {
+		return !isLess
+	}
+	numAtt := len(l.Attachments(issue))
+	if isLess {
+		return numAtt < num
+	}
+	return numAtt <= num
 }
 
 // ModifyTag adds or removes a tag for a given issue
