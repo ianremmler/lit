@@ -382,7 +382,7 @@ func (l *Lit) Attach(issue *dgrl.Branch, src, username, comment string) (string,
 		attachComment += fmt.Sprintf("\n\n%s", comment)
 	}
 	dir := l.IssueDir(issue)
-	if err := os.Mkdir(dir, 0777); !os.IsExist(err) {
+	if err := os.Mkdir(dir, 0777); err != nil && !os.IsExist(err) {
 		return "", err
 	}
 	dst := path.Join(dir, path.Base(filename))
