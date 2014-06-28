@@ -17,44 +17,20 @@ import (
 
 const usage = `usage:
 
-lit [help | usage]
-	Show usage
-
-lit init
-	Initialize new issue tracker
-
-lit new [<num>]
-	Create num new issues (default: 1)
-
-lit id [<sort>] <spec>
-	List ids of specified issues (default: open)
-
-lit list [<sort>] <spec>
-	Show list of specified issues (default: open)
-
-lit show [<sort>] <spec>
-	Show specified issues (default: open)
-
-lit set <key> <val> <spec>
-	Set value for key in specified issues
-
-lit tag (add|del) <tag> <spec>
-	Add or delete tag in specified issues
-
-lit comment <id> [<text>]
-	Add issue comment (default: edit text)
-
+lit [help | usage]              Show usage
+lit init                        Initialize new issue tracker
+lit new [<num>]                 Create num new issues (default: 1)
+lit id [<sort>] <spec>          List ids of specified issues (default: open)
+lit list [<sort>] <spec>        Show list of specified issues (default: open)
+lit show [<sort>] <spec>        Show specified issues (default: open)
+lit set <key> <val> <spec>      Set value for key in specified issues
+lit tag (add|del) <tag> <spec>  Add or delete tag in specified issues
+lit comment <id> [<text>]       Add issue comment (default: edit text)
+lit edit <spec>                 Edit specified issues (default: open)
+lit close <spec>                Close specified issues
+lit reopen <spec>               Reopen specified issues
 lit attach (add <id> <file> [<desc>] | show <id> <file> | list <id>)
 	Add, show, or list issue attachments
-
-lit edit <spec>
-	Edit specified issues (default: open)
-
-lit close <spec>
-	Close specified issues
-
-lit reopen <spec>
-	Reopen specified issues
 
 sort: (sortby|rsortby) <key>
 	Sort (reverse if rsortby) based on key
