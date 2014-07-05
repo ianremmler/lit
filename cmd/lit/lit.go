@@ -174,7 +174,12 @@ func showCmd() {
 		it.Sort(ids, key, doAscend)
 	}
 	for _, id := range ids {
-		fmt.Println(it.Issue(id))
+		issue := it.Issue(id)
+		if issue == nil {
+			log.Printf("set: error finding issue %s\n", id)
+			continue
+		}
+		fmt.Println(issue)
 	}
 }
 
