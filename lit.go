@@ -108,7 +108,7 @@ func (l *Lit) indexIssues() {
 			l.issueMap[id] = issue
 		}
 	}
-	sort.Sort(sort.StringSlice(l.issueIds))
+	sort.Strings(l.issueIds)
 }
 
 // Load parses the issue file and populates the list of issues
@@ -371,6 +371,7 @@ func setToTagStr(set map[string]struct{}) string {
 	for tag := range set {
 		tags = append(tags, tag)
 	}
+	sort.Strings(tags)
 	return strings.TrimSpace(strings.Join(tags, " "))
 }
 
