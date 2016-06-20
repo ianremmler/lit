@@ -18,11 +18,14 @@ Issues are stored in a single text file in
 [Doggerel](https://github.com/ianremmler/dgrl) format.
 
 Some [scripts](https://github.com/ianremmler/lit/tree/master/scripts) are
-included to enable complex queries from the command line.  For example, to list
-the issues that are open and either assigned to user bob or have priority
-greater than 1:
+included to enable complex queries from the command line.  Using shell command
+substitution, the syntax looks a bit like Lisp.  For example, to list the
+issues that are open and either assigned to user bob or have priority greater
+than 1:
 
 ```
-((lit id with assigned bob; lit id greater priority 1) | lit-or; \
- lit id without closed) | lit-and | lit list
+# Note: 'lit id' returns ids of open issues
+lit list $(andl $(lit id) \
+                $(orl $(lit with assigned bob) \
+                      $(lit greater priority 1)))
 ```

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 )
 
 const (
+	issueBaseDir  = ".lit"
 	issueFilename = "issues"
 )
 
@@ -66,10 +68,10 @@ func Set(issue *dgrl.Branch, key, val string) bool {
 
 // Lit stores and manipulates issues
 type Lit struct {
-	issues    *dgrl.Branch
-	issueIds  []string
-	issueMap  map[string]*dgrl.Branch
-	issuePath string
+	issues   *dgrl.Branch
+	issueIds []string
+	issueMap map[string]*dgrl.Branch
+	issueDir string
 }
 
 // New constructs a new Lit.
@@ -79,23 +81,25 @@ func New() *Lit {
 
 // Init initializes the issue tracker.
 func (l *Lit) Init() error {
-	issueFile, err := os.OpenFile(issueFilename, os.O_RDWR|os.O_CREATE, 0666)
+	if err := os.Mkdir(issueBaseDir, 0777); err != nil && !os.IsExist(err) {
+		return err
+	}
+
+	path := filepath.Join(issueBaseDir, issueFilename)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
-	issueFile.Close()
+	file.Close()
 	return nil
 }
-
-// IssueFile returns the name of the issue file
-func (l *Lit) IssueFile() string { return l.issuePath }
 
 // IssueDir returns the directory name that corresponds to an issue
 func (l *Lit) IssueDir(issue *dgrl.Branch) string {
 	if issue == nil {
 		return ""
 	}
-	return path.Join(path.Dir(l.issuePath), issue.Key())
+	return path.Join(l.issueDir, issue.Key())
 }
 
 func (l *Lit) indexIssues() {
@@ -111,18 +115,37 @@ func (l *Lit) indexIssues() {
 	sort.Strings(l.issueIds)
 }
 
+func issueDir() (string, error) {
+	path, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for p := path; len(p) > 1; p = filepath.Dir(p) {
+		dir := filepath.Join(p, issueBaseDir)
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return dir, nil
+		}
+	}
+	return "", errors.New("issue directory not found")
+}
+
 // Load parses the issue file and populates the list of issues
 func (l *Lit) Load() error {
-	issueFile, err := openFile(issueFilename, os.O_RDONLY, 0)
+	dir, err := issueDir()
 	if err != nil {
 		return err
 	}
-	l.issuePath = issueFile.Name()
-	defer issueFile.Close()
-	issues := dgrl.NewParser().Parse(issueFile)
+	path := filepath.Join(dir, issueFilename)
+	file, err := openFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	issues := dgrl.NewParser().Parse(file)
 	if issues == nil {
 		return errors.New("error parsing issue file")
 	}
+	l.issueDir = dir
 	l.issues = issues
 	l.indexIssues()
 	return nil
@@ -130,12 +153,13 @@ func (l *Lit) Load() error {
 
 // Store writes the issue list to the file
 func (l *Lit) Store() error {
-	issueFile, err := openFile(issueFilename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	path := filepath.Join(l.issueDir, issueFilename)
+	file, err := openFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		return err
 	}
-	defer issueFile.Close()
-	err = l.issues.Write(issueFile)
+	defer file.Close()
+	err = l.issues.Write(file)
 	if err != nil {
 		return err
 	}

@@ -15,13 +15,14 @@ import (
 	"github.com/ianremmler/lit"
 )
 
-const usage = `usage:
+const usage = `Usage:
 
-lit [help | usage]              Show usage
+lit -h | -help | --help | help  Show help
+lit                             List open issues
 lit init                        Initialize new issue tracker
 lit new [<num>]                 Create num new issues (default: 1)
-lit id [<sort>] <spec>          List ids of specified issues (default: open)
-lit list [<sort>] <spec>        Show list of specified issues (default: open)
+lit [id] [<sort>] <spec>        Show ids of specified issues (default: open)
+lit list [<sort>] <spec>        List specified issues (default: open)
 lit show [<sort>] <spec>        Show specified issues (default: open)
 lit set <key> <val> <spec>      Set value for key in specified issues
 lit tag (add|del) <tag> <spec>  Add or delete tag in specified issues
@@ -83,7 +84,7 @@ func main() {
 		args = args[1:]
 	}
 	switch cmd {
-	case "", "-h", "-help", "--help", "help", "-u", "-usage", "--usage", "usage":
+	case "-h", "-help", "--help", "help":
 		usageCmd()
 	case "init":
 		initCmd()
@@ -91,7 +92,7 @@ func main() {
 		newCmd()
 	case "id":
 		idCmd()
-	case "list":
+	case "list", "":
 		listCmd()
 	case "show":
 		showCmd()
@@ -108,7 +109,8 @@ func main() {
 	case "close", "reopen":
 		closeCmd()
 	default:
-		log.Fatalln(cmd + " is not a valid command")
+		cmd, args = "id", append([]string{cmd}, args...)
+		idCmd()
 	}
 }
 
@@ -176,7 +178,7 @@ func showCmd() {
 	for _, id := range ids {
 		issue := it.Issue(id)
 		if issue == nil {
-			log.Printf("set: error finding issue %s\n", id)
+			log.Printf("show: error finding issue %s\n", id)
 			continue
 		}
 		fmt.Println(issue)
@@ -572,7 +574,11 @@ func storeIssues() {
 
 func checkErr(err error) {
 	if err != nil {
-		log.Fatalf("%s: %s\n", cmd, err)
+		str := ""
+		if cmd != "" {
+			str += cmd + ": "
+		}
+		log.Fatalf("%s%s\n", str, err)
 	}
 }
 
