@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/ianremmler/dgrl"
-	"github.com/pborman/uuid"
+	"github.com/satori/go.uuid"
 )
 
 const (
@@ -183,7 +183,7 @@ func (l *Lit) NewIssues(username string, num int) []*dgrl.Branch {
 	issues := make([]*dgrl.Branch, num)
 	stamp := Stamp(username)
 	for i := range issues {
-		id := uuid.New()
+		id := uuid.NewV4().String()
 		issue := dgrl.NewBranch(id)
 		issue.Append(dgrl.NewLeaf("created", stamp))
 		issue.Append(dgrl.NewLeaf("updated", stamp))
