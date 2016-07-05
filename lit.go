@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -284,7 +285,7 @@ func (l *Lit) contains(issue *dgrl.Branch, key, val string) bool {
 		if val == "" && issueVal == "" {
 			return false
 		}
-		if strings.Contains(issueVal, val) {
+		if ok, err := regexp.MatchString(val, issueVal); err == nil && ok {
 			return true
 		}
 	}
@@ -297,12 +298,12 @@ func commentContains(issue *dgrl.Branch, val string) bool {
 	}
 	for _, k := range issue.Kids() {
 		if comment, ok := k.(*dgrl.Branch); ok {
-			if strings.Contains(comment.Key(), val) {
+			if ok, err := regexp.MatchString(val, comment.Key()); err == nil && ok {
 				return true
 			}
 			for _, kk := range comment.Kids() {
 				if leaf, ok := kk.(*dgrl.Leaf); ok {
-					if strings.Contains(leaf.Value(), val) {
+					if ok, err := regexp.MatchString(val, leaf.Value()); err == nil && ok {
 						return true
 					}
 				}
@@ -318,7 +319,7 @@ func (l *Lit) attachContains(issue *dgrl.Branch, val string) bool {
 		return len(att) > 0
 	}
 	for _, file := range att {
-		if strings.Contains(file, val) {
+		if ok, err := regexp.MatchString(val, file); err == nil && ok {
 			return true
 		}
 	}
