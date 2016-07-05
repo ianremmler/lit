@@ -9,7 +9,7 @@ To install lit, install Go if it isn't already, and run:
 go get github.com/ianremmler/lit/cmd/lit
 ```
 
-Run `lit` with no arguments to see how to use it.
+Run `lit help` to see how to use it.
 
 Currently, the only configuration available is the environment variable
 `LIT_USER` which, if set, will be used instead of the current username.

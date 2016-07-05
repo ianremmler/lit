@@ -15,19 +15,16 @@ import (
 	"github.com/ianremmler/lit"
 )
 
-const usage = `Usage:
-
-lit -h | -help | --help | help  Show help
-lit                             List open issues
+const usage = `lit help                        Display usage information
 lit init                        Initialize new issue tracker
 lit new [<num>]                 Create num new issues (default: 1)
-lit [id] [<sort>] <spec>        Show ids of specified issues (default: open)
-lit list [<sort>] <spec>        List specified issues (default: open)
-lit show [<sort>] <spec>        Show specified issues (default: open)
+lit [id] [<sort>] <spec>        Show ids of specified issues
+lit list [<sort>] <spec>        List specified issues
+lit show [<sort>] <spec>        Show specified issues
 lit set <key> <val> <spec>      Set value for key in specified issues
 lit tag (add|del) <tag> <spec>  Add or delete tag in specified issues
 lit comment <id> [<text>]       Add issue comment (default: edit text)
-lit edit <spec>                 Edit specified issues (default: open)
+lit edit <spec>                 Edit specified issues
 lit close <spec>                Close specified issues
 lit reopen <spec>               Reopen specified issues
 lit attach (add <id> <file> [<desc>] | show <id> <file> | list <id>)
@@ -36,9 +33,9 @@ lit attach (add <id> <file> [<desc>] | show <id> <file> | list <id>)
 sort: (sortby|rsortby) <key>
 	Sort (reverse if rsortby) based on key
 
-spec: all | <ids> | (with|without) <key> [<val>] | (less|greater) <key> <val>
+spec: open | closed | all | <ids> |
+      (with | without | less | greater) <key> [<val>]
 	Specifies which issues to operate on
-	Default open spec does not apply if input is piped
 	Use 'comment' key to filter by comment contents and times
 	Use 'attach' key to filter by attachment names and counts`
 
@@ -48,12 +45,11 @@ const (
 )
 
 var (
-	args        = os.Args[1:]
-	it          = lit.New()
-	listHdr     = fmt.Sprintf(listFmt, "id", "c", "p", "a", "assigned", "tags", "summary")
-	username    = "?"
-	isStdinPipe = false
-	cmd         string
+	args     = os.Args[1:]
+	it       = lit.New()
+	listHdr  = fmt.Sprintf(listFmt, "id", "c", "p", "a", "assigned", "tags", "summary")
+	username = "?"
+	cmd      = "id"
 )
 
 func main() {
@@ -72,10 +68,8 @@ func main() {
 
 	// append args piped in from stdin
 	if stat, err := os.Stdin.Stat(); err == nil && stat.Mode()&os.ModeNamedPipe != 0 {
-		isStdinPipe = true
 		if stdin, err := ioutil.ReadAll(os.Stdin); err == nil {
-			stdinArgs := strings.Fields(string(stdin))
-			args = append(args, stdinArgs...)
+			args = append(args, strings.Fields(string(stdin))...)
 		}
 	}
 
@@ -92,7 +86,7 @@ func main() {
 		newCmd()
 	case "id":
 		idCmd()
-	case "list", "":
+	case "list":
 		listCmd()
 	case "show":
 		showCmd()
@@ -141,7 +135,7 @@ func newCmd() {
 func idCmd() {
 	loadIssues()
 	doSort, key, doAscend := dispOpts()
-	ids := specIds(!isStdinPipe)
+	ids := specIds()
 	if doSort {
 		it.Sort(ids, key, doAscend)
 	}
@@ -155,7 +149,7 @@ func idCmd() {
 func listCmd() {
 	loadIssues()
 	doSort, key, doAscend := dispOpts()
-	ids := specIds(!isStdinPipe)
+	ids := specIds()
 	if doSort {
 		it.Sort(ids, key, doAscend)
 	}
@@ -171,7 +165,7 @@ func listCmd() {
 func showCmd() {
 	loadIssues()
 	doSort, key, doAscend := dispOpts()
-	ids := specIds(!isStdinPipe)
+	ids := specIds()
 	if doSort {
 		it.Sort(ids, key, doAscend)
 	}
@@ -193,7 +187,7 @@ func setCmd() {
 	args = args[2:]
 	loadIssues()
 	stamp := lit.Stamp(username)
-	for _, id := range specIds(false) {
+	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("set: error finding issue %s\n", id)
@@ -222,7 +216,7 @@ func tagCmd() {
 
 	loadIssues()
 	stamp := lit.Stamp(username)
-	for _, id := range specIds(false) {
+	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("tag: error finding issue %s\n", id)
@@ -390,7 +384,7 @@ func editCmd() {
 	filename := tempFile.Name()
 
 	// load issue content into temp file
-	ids := specIds(!isStdinPipe)
+	ids := specIds()
 	toEdit := dgrl.NewRoot()
 	for _, id := range ids {
 		issue := it.Issue(id)
@@ -461,7 +455,7 @@ func editCmd() {
 func closeCmd() {
 	loadIssues()
 	stamp := lit.Stamp(username)
-	for _, id := range specIds(false) {
+	for _, id := range specIds() {
 		issue := it.Issue(id)
 		if issue == nil {
 			log.Printf("%s: error finding issue %s\n", cmd, id)
@@ -539,23 +533,27 @@ func dispOpts() (bool, string, bool) {
 	return false, "", true
 }
 
-func specIds(isDefaultOpen bool) []string {
+func specIds() []string {
 	ids := []string{}
-	switch {
-	case len(args) == 0:
-		if isDefaultOpen {
-			ids = matchIds([]string{"closed", ""}, false)
-		}
-	case args[0] == "with":
-		ids = matchIds(args[1:], true)
-	case args[0] == "without":
-		ids = matchIds(args[1:], false)
-	case args[0] == "less":
-		ids = compareIds(args[1:], true)
-	case args[0] == "greater":
-		ids = compareIds(args[1:], false)
-	case args[0] == "all":
+	filt := ""
+	if len(args) > 0 {
+		filt = args[0]
+	}
+	switch filt {
+	case "all":
 		ids = it.IssueIds()
+	case "open":
+		ids = matchIds([]string{"closed", ""}, false)
+	case "closed":
+		ids = matchIds([]string{"closed", ""}, true)
+	case "with":
+		ids = matchIds(args[1:], true)
+	case "without":
+		ids = matchIds(args[1:], false)
+	case "less":
+		ids = compareIds(args[1:], true)
+	case "greater":
+		ids = compareIds(args[1:], false)
 	default:
 		ids = args
 	}
